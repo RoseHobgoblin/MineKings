@@ -1,0 +1,33 @@
+{
+  "displayName": "Nordic",
+  "biomes": [
+    "minecraft:snowy_plains",
+    "minecraft:taiga",
+    "minecraft:grove",
+    "minecraft:snowy_taiga",
+    "minecraft:ice_spikes",
+    "minecraft:frozen_peaks",
+    "minecraft:snowy_slopes",
+    "minecraft:old_growth_pine_taiga",
+    "minecraft:old_growth_spruce_taiga"
+  ],
+  "tiers": ["Hold", "Jarldom", "High Kingdom"],
+  "leaderTitles": ["Thane", "Jarl", "High King"],
+  "polityNameFormat": "{place} {tier}",
+  "firstNames": [
+    "Ragnar", "Sigurd", "Bjorn", "Leif", "Harald", "Ivar", "Olaf", "Knut",
+    "Erik", "Gunnar", "Thorkell", "Sven", "Ulf", "Rolf", "Halfdan", "Hakon",
+    "Alfarin", "Brynjar", "Dagfinn", "Einar", "Frodi", "Geirr", "Hrolf", "Jorund",
+    "Astrid", "Bergljot", "Dagny", "Eira", "Freydis", "Gunnhild", "Helga", "Ingrid",
+    "Jorunn", "Kari", "Liv", "Magnhild", "Nanna", "Ragnhild", "Sigrid", "Thyra",
+    "Unn", "Vigdis", "Yrsa"
+  ],
+  "lastNames": [
+    "Ironbeard", "Frostborn", "Stormcrow", "Wolfsbane", "Bjornsson", "Ravenclaw",
+    "Snowrider", "Thundertongue", "Axehand", "Shieldbreaker", "Longspear",
+    "Hammerhand", "Whiteoak", "Coldforge", "Icebrow", "Bearcloak", "Hrafnsson",
+    "Halvarsson", "Eirikson", "Sigurdsson", "Olafson", "Vargsson", "Bjornsdottir",
+    "Astridsdottir", "Frejasdottir", "Gunnhildsdottir", "Thorirson", "Ulfrsson",
+    "Hakonson", "Ragnarsson"
+  ]
+}

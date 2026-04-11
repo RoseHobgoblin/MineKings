@@ -1,0 +1,25 @@
+{
+  "displayName": "Steppe",
+  "biomes": [
+    "minecraft:savanna",
+    "minecraft:savanna_plateau",
+    "minecraft:windswept_savanna"
+  ],
+  "tiers": ["Camp", "Clan", "Khanate"],
+  "leaderTitles": ["Chief", "Elder", "Khan"],
+  "polityNameFormat": "{tier} of {place}",
+  "firstNames": [
+    "Temujin", "Batu", "Subotai", "Kublai", "Ogedei", "Chagatai", "Jochi", "Hulagu",
+    "Borte", "Sorghaghtani", "Toregene", "Altani", "Qaidu", "Berke", "Mongke", "Arghun",
+    "Tsetseg", "Oyuunbileg", "Narantuya", "Saran", "Altan", "Bayar", "Chinua", "Delgar",
+    "Erdene", "Gansukh", "Khatun", "Mergen", "Nergui", "Orbei", "Qara", "Temur",
+    "Uyanga", "Yesui", "Zayar", "Bolor", "Chuluun", "Dorj", "Enkh", "Ganbaatar"
+  ],
+  "lastNames": [
+    "of the Golden Steppe", "of the Iron Horde", "of the Silver Sky", "of the Red Hills",
+    "Swiftarrow", "Stormhoof", "Sunstrider", "Windcaller", "Bluelake", "Stoneheart",
+    "Eagleeye", "Wolfhunter", "Tallgrass", "Openskies", "Farwater", "Dusthand",
+    "Brightmane", "Ironring", "Longrein", "Darkfeather", "Sandborn", "Moonrider",
+    "Highsaddle", "Swiftcurrent", "Whitetent", "Greathawk", "Broadspear", "Nightrider"
+  ]
+}

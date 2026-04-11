@@ -1,0 +1,22 @@
+{
+  "displayName": "Common",
+  "biomes": [],
+  "tiers": ["Barony", "County", "Duchy", "Kingdom", "Empire"],
+  "leaderTitles": ["Baron", "Count", "Duke", "King", "Emperor"],
+  "polityNameFormat": "{tier} of {place}",
+  "firstNames": [
+    "Aldric", "Baldwin", "Cedric", "Donovan", "Edric", "Fergus", "Godwin", "Harold",
+    "Ivor", "Jerrod", "Kenric", "Lionel", "Morgan", "Nyle", "Osric", "Percival",
+    "Quentin", "Roland", "Sigmund", "Tristan", "Ulric", "Varian", "Wilfred", "Xavion",
+    "Yorick", "Zephan", "Adela", "Brenna", "Celestine", "Dierdre", "Elara", "Fiora",
+    "Gwyneth", "Helene", "Isolde", "Juna", "Kirra", "Lyra", "Mirela", "Nerys",
+    "Ophira", "Petra", "Rhiannon", "Seren", "Thessaly", "Una", "Vela", "Wren"
+  ],
+  "lastNames": [
+    "Ashworth", "Blackwood", "Crestfall", "Drakemoor", "Everhart", "Fairwick",
+    "Greystone", "Hawthorne", "Ironsides", "Jessop", "Kingsley", "Lockwood",
+    "Marchford", "Northcott", "Orrington", "Pemberton", "Quincewood", "Ravenscar",
+    "Stormwell", "Thornbury", "Underhill", "Valewood", "Westmoor", "Yarrowfell",
+    "Alderbrook", "Bramblecroft", "Coldspring", "Darkmere", "Emberton", "Foxhaven"
+  ]
+}
