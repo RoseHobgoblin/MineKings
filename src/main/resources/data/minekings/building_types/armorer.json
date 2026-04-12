@@ -4,5 +4,6 @@
   "priority": 1,
   "blocks": {
     "minecraft:blast_furnace": 1
-  }
+  },
+  "dailyIncome": 3.0
 }

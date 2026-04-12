@@ -51,6 +51,7 @@ public class Village implements Iterable<Building> {
     private int beds;
     private long lastBedSync;
     private boolean autoScan = false;
+    private long stockpile = 0L;
     private BoundingBox box = new BoundingBox(0, 0, 0, 0, 0, 0);
 
     public Village(int id, ServerLevel world) {
@@ -63,6 +64,7 @@ public class Village implements Iterable<Building> {
         this.id = v.getInt("id");
         this.name = v.getString("name");
         this.beds = v.getInt("beds");
+        this.stockpile = v.contains("stockpile") ? v.getLong("stockpile") : 0L;
         this.world = world;
         if (v.contains("autoScan")) {
             this.autoScan = v.getBoolean("autoScan");
@@ -224,10 +226,15 @@ public class Village implements Iterable<Building> {
         v.putInt("id", id);
         v.putString("name", name);
         v.putInt("beds", beds);
+        v.putLong("stockpile", stockpile);
         v.put("buildings", MKNbtHelper.fromList(buildings.values(), Building::save));
         v.putBoolean("autoScan", autoScan);
         return v;
     }
+
+    public long getStockpile() { return stockpile; }
+    public void setStockpile(long stockpile) { this.stockpile = stockpile; }
+    public void addStockpile(long delta) { this.stockpile += delta; }
 
     public void merge(Village village) {
         buildings.putAll(village.buildings);

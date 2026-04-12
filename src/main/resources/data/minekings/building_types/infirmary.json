@@ -10,5 +10,6 @@
   },
   "noBeds": true,
   "iconU": 7,
-  "iconV": 1
+  "iconV": 1,
+  "dailyIncome": 1.0
 }

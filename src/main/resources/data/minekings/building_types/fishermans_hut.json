@@ -4,5 +4,6 @@
   "priority": 1,
   "blocks": {
     "minecraft:barrel": 1
-  }
+  },
+  "dailyIncome": 4.0
 }

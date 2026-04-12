@@ -1,6 +1,7 @@
 package com.minekings.minekings.politics;
 
 import com.minekings.minekings.MineKings;
+import com.minekings.minekings.village.Building;
 import com.minekings.minekings.village.Village;
 import com.minekings.minekings.village.VillageManager;
 import com.minekings.minekings.village.util.MKWorldUtils;
@@ -300,6 +301,18 @@ public class PoliticsManager extends SavedData {
         return pool.get(world.random.nextInt(pool.size()));
     }
 
+    /**
+     * Sums the {@code dailyIncome} of every building in the village,
+     * as defined in the building-type JSONs. Returns the rounded total.
+     */
+    public static long computeVillageDailyIncome(Village village) {
+        double total = 0.0;
+        for (Building b : village) {
+            total += b.getBuildingType().dailyIncome();
+        }
+        return Math.round(total);
+    }
+
     // ----- Allegiance mutation -----
 
     public boolean swearFealty(int vassalId, int lordId, long currentDay) {
@@ -380,9 +393,39 @@ public class PoliticsManager extends SavedData {
             }
         }
 
-        // 3. Treasury accrual
+        // 3. Economy pass: production → village stockpile → polity treasury → tribute
+        VillageManager vmEcon = VillageManager.get(level);
+        // 3a. Buildings produce into village stockpiles
+        for (Village v : vmEcon) {
+            long income = computeVillageDailyIncome(v);
+            if (income != 0L) {
+                v.addStockpile(income);
+            }
+        }
+        // 3b. Polity taxation — skim taxRate from each held village's stockpile
         for (Polity p : polities.values()) {
-            p.addTreasury(10L * p.getHeldVillageIds().size());
+            for (int villageId : p.getHeldVillageIds()) {
+                vmEcon.getOrEmpty(villageId).ifPresent(v -> {
+                    long skim = (long) Math.floor(v.getStockpile() * p.getTaxRate());
+                    if (skim > 0L) {
+                        v.addStockpile(-skim);
+                        p.addTreasury(skim);
+                    }
+                });
+            }
+        }
+        vmEcon.setDirty(); // village stockpiles changed
+        // 3c. Tribute flow — vassal treasury → lord treasury
+        for (Allegiance a : allegiances) {
+            Polity vassal = polities.get(a.vassalPolityId());
+            Polity lord = polities.get(a.lordPolityId());
+            if (vassal != null && lord != null && vassal.getTreasury() > 0) {
+                long tribute = (long) Math.floor(vassal.getTreasury() * vassal.getTributeRate());
+                if (tribute > 0L) {
+                    vassal.addTreasury(-tribute);
+                    lord.addTreasury(tribute);
+                }
+            }
         }
 
         // (Character aging is derived from birthDay, not stored.)
@@ -462,6 +505,11 @@ public class PoliticsManager extends SavedData {
 
     public Optional<UUID> getEmbodimentUuid(int characterId) {
         return Optional.ofNullable(embodiments.get(characterId));
+    }
+
+    /** Reverse lookup: given a villager UUID, returns the characterId they embody, or null. */
+    public Integer getEmbodiedBy(UUID villagerUuid) {
+        return embodiedBy.get(villagerUuid);
     }
 
     /**

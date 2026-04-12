@@ -7,5 +7,6 @@
     "#c:chests": 4
   },
   "iconU": 3,
-  "iconV": 1
+  "iconV": 1,
+  "dailyIncome": 2.0
 }

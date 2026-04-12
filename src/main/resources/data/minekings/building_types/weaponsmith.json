@@ -4,5 +4,6 @@
   "priority": 1,
   "blocks": {
     "minecraft:grindstone": 1
-  }
+  },
+  "dailyIncome": 3.0
 }

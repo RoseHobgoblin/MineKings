@@ -19,6 +19,8 @@ import java.util.List;
  */
 public final class Polity {
     public static final int LEADER_VACANT = -1;
+    public static final float DEFAULT_TAX_RATE = 0.25f;
+    public static final float DEFAULT_TRIBUTE_RATE = 0.10f;
 
     private final int id;
     private String name;
@@ -26,6 +28,8 @@ public final class Polity {
     private int leaderCharacterId;
     private final List<Integer> heldVillageIds;
     private long treasury;
+    private float taxRate;
+    private float tributeRate;
     private final long foundedOnDay;
 
     public Polity(int id, String name, String cultureName, int leaderCharacterId, long foundedOnDay) {
@@ -35,6 +39,8 @@ public final class Polity {
         this.leaderCharacterId = leaderCharacterId;
         this.heldVillageIds = new ArrayList<>();
         this.treasury = 0L;
+        this.taxRate = DEFAULT_TAX_RATE;
+        this.tributeRate = DEFAULT_TRIBUTE_RATE;
         this.foundedOnDay = foundedOnDay;
     }
 
@@ -49,6 +55,8 @@ public final class Polity {
             for (int v : arr) this.heldVillageIds.add(v);
         }
         this.treasury = nbt.getLong("treasury");
+        this.taxRate = nbt.contains("taxRate") ? nbt.getFloat("taxRate") : DEFAULT_TAX_RATE;
+        this.tributeRate = nbt.contains("tributeRate") ? nbt.getFloat("tributeRate") : DEFAULT_TRIBUTE_RATE;
         this.foundedOnDay = nbt.contains("foundedOnDay") ? nbt.getLong("foundedOnDay") : 0L;
     }
 
@@ -62,6 +70,8 @@ public final class Polity {
         for (int i = 0; i < arr.length; i++) arr[i] = heldVillageIds.get(i);
         nbt.put("heldVillages", new IntArrayTag(arr));
         nbt.putLong("treasury", treasury);
+        nbt.putFloat("taxRate", taxRate);
+        nbt.putFloat("tributeRate", tributeRate);
         nbt.putLong("foundedOnDay", foundedOnDay);
         return nbt;
     }
@@ -76,6 +86,10 @@ public final class Polity {
     public long getTreasury() { return treasury; }
     public void setTreasury(long treasury) { this.treasury = treasury; }
     public void addTreasury(long delta) { this.treasury += delta; }
+    public float getTaxRate() { return taxRate; }
+    public void setTaxRate(float taxRate) { this.taxRate = Math.max(0f, Math.min(1f, taxRate)); }
+    public float getTributeRate() { return tributeRate; }
+    public void setTributeRate(float tributeRate) { this.tributeRate = Math.max(0f, Math.min(1f, tributeRate)); }
     public long getFoundedOnDay() { return foundedOnDay; }
 
     /** Adds a held village, deduping silently. */

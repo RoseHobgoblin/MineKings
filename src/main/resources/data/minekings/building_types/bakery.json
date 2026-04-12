@@ -5,5 +5,6 @@
   "blocks": {
     "minecraft:cake": 1,
     "minecraft:smoker": 1
-  }
+  },
+  "dailyIncome": 4.0
 }

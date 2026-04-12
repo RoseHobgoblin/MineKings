@@ -10,5 +10,6 @@
   "iconU": 1,
   "iconV": 0,
   "grouped": true,
-  "mergeRange": 32
+  "mergeRange": 32,
+  "dailyIncome": 2.0
 }

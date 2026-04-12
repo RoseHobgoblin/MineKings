@@ -7,5 +7,6 @@
     "minecraft:lectern": 1
   },
   "iconU": 7,
-  "iconV": 0
+  "iconV": 0,
+  "dailyIncome": 2.0
 }

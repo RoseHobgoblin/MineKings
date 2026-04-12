@@ -4,5 +4,6 @@
   "priority": 1,
   "blocks": {
     "minecraft:lectern": 1
-  }
+  },
+  "dailyIncome": 2.0
 }

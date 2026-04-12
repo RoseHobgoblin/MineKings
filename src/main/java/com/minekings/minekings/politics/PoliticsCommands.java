@@ -3,6 +3,7 @@ package com.minekings.minekings.politics;
 import com.minekings.minekings.village.Village;
 import com.minekings.minekings.village.VillageManager;
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -100,7 +101,19 @@ public final class PoliticsCommands {
                         .requires(src -> src.hasPermission(2))
                         .then(Commands.argument("id", IntegerArgumentType.integer(0))
                                 .suggests(polityIdSuggestions)
-                                .executes(PoliticsCommands::polRebind)));
+                                .executes(PoliticsCommands::polRebind)))
+                .then(Commands.literal("settax")
+                        .requires(src -> src.hasPermission(2))
+                        .then(Commands.argument("id", IntegerArgumentType.integer(0))
+                                .suggests(polityIdSuggestions)
+                                .then(Commands.argument("rate", FloatArgumentType.floatArg(0f, 1f))
+                                        .executes(PoliticsCommands::polSetTax))))
+                .then(Commands.literal("settribute")
+                        .requires(src -> src.hasPermission(2))
+                        .then(Commands.argument("id", IntegerArgumentType.integer(0))
+                                .suggests(polityIdSuggestions)
+                                .then(Commands.argument("rate", FloatArgumentType.floatArg(0f, 1f))
+                                        .executes(PoliticsCommands::polSetTribute))));
     }
 
     // =====================================================================
@@ -125,8 +138,8 @@ public final class PoliticsCommands {
                 return lord != null ? mgr.getPolityDisplayName(lord) : ("#" + a.lordPolityId());
             }).orElse("none");
 
-            String line = String.format("[%d] %s  culture=%s  villages=%d  liege=%s",
-                    p.getId(), display, p.getCultureName(), p.getHeldVillageIds().size(), liegeStr);
+            String line = String.format("[%d] %s  culture=%s  villages=%d  treasury=%d  liege=%s",
+                    p.getId(), display, p.getCultureName(), p.getHeldVillageIds().size(), p.getTreasury(), liegeStr);
             src.sendSuccess(() -> Component.literal(line), false);
         }
         return Command.SINGLE_SUCCESS;
@@ -156,6 +169,8 @@ public final class PoliticsCommands {
         src.sendSuccess(() -> Component.literal("Culture: " + p.getCultureName()), false);
         src.sendSuccess(() -> Component.literal("Founded: day " + p.getFoundedOnDay()), false);
         src.sendSuccess(() -> Component.literal("Treasury: " + p.getTreasury()), false);
+        src.sendSuccess(() -> Component.literal(String.format("Tax rate: %.0f%%  Tribute rate: %.0f%%",
+                p.getTaxRate() * 100f, p.getTributeRate() * 100f)), false);
         if (leader != null) {
             src.sendSuccess(() -> Component.literal("Leader: " + leaderTitle + " " + leader.getName() + " (#" + leader.getId() + ")"), false);
             UUID embodimentUuid = mgr.getEmbodimentUuid(leader.getId()).orElse(null);
@@ -179,7 +194,10 @@ public final class PoliticsCommands {
         List<String> villageLines = p.getHeldVillageIds().stream()
                 .map(vid -> {
                     Optional<Village> v = vm.getOrEmpty(vid);
-                    return v.map(value -> "  #" + vid + " " + value.getName()).orElseGet(() -> "  #" + vid + " (missing)");
+                    return v.map(value -> {
+                        long income = PoliticsManager.computeVillageDailyIncome(value);
+                        return String.format("  #%d %s  stockpile=%d  %+d/day", vid, value.getName(), value.getStockpile(), income);
+                    }).orElseGet(() -> "  #" + vid + " (missing)");
                 })
                 .collect(Collectors.toList());
         src.sendSuccess(() -> Component.literal("Villages (" + p.getHeldVillageIds().size() + "):"), false);
@@ -454,6 +472,40 @@ public final class PoliticsCommands {
         } else {
             src.sendSuccess(() -> Component.literal("Polity " + id + " leader is unbound — no candidate villager found in the village bounds."), true);
         }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int polSetTax(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        ServerLevel level = src.getLevel();
+        PoliticsManager mgr = PoliticsManager.get(level);
+        int id = IntegerArgumentType.getInteger(ctx, "id");
+        float rate = FloatArgumentType.getFloat(ctx, "rate");
+        Optional<Polity> opt = mgr.getPolity(id);
+        if (opt.isEmpty()) {
+            src.sendFailure(Component.literal("No polity with id " + id));
+            return 0;
+        }
+        opt.get().setTaxRate(rate);
+        mgr.setDirty();
+        src.sendSuccess(() -> Component.literal(String.format("Polity %d tax rate set to %.0f%%", id, rate * 100f)), true);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int polSetTribute(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        ServerLevel level = src.getLevel();
+        PoliticsManager mgr = PoliticsManager.get(level);
+        int id = IntegerArgumentType.getInteger(ctx, "id");
+        float rate = FloatArgumentType.getFloat(ctx, "rate");
+        Optional<Polity> opt = mgr.getPolity(id);
+        if (opt.isEmpty()) {
+            src.sendFailure(Component.literal("No polity with id " + id));
+            return 0;
+        }
+        opt.get().setTributeRate(rate);
+        mgr.setDirty();
+        src.sendSuccess(() -> Component.literal(String.format("Polity %d tribute rate set to %.0f%%", id, rate * 100f)), true);
         return Command.SINGLE_SUCCESS;
     }
 }

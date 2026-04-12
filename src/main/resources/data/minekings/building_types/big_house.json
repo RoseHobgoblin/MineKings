@@ -6,5 +6,6 @@
     "#minecraft:beds": 4
   },
   "iconU": 4,
-  "iconV": 1
+  "iconV": 1,
+  "dailyIncome": 1.0
 }
