@@ -11,5 +11,9 @@
   "noBeds": true,
   "iconU": 7,
   "iconV": 1,
-  "dailyIncome": 1.0
+  "dailyIncome": 1.0,
+  "produces": {},
+  "consumes": {
+    "gold": 1.0
+  }
 }

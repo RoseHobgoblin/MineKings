@@ -3,5 +3,9 @@
   "visible": false,
   "priority": 0,
   "blocks": {},
-  "dailyIncome": 0.5
+  "dailyIncome": 0.5,
+  "produces": {
+    "gold": 0.5
+  },
+  "consumes": {}
 }

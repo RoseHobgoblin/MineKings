@@ -69,8 +69,10 @@ public class PolityScreen extends Screen {
         // === Economy ===
         gfx.drawString(this.font, "Treasury: " + data.treasury() + " gold", x, y, TEXT_COLOR);
         y += 12;
-        long totalDailyIncome = data.villages().stream().mapToLong(PolityViewPayload.VillageRow::dailyIncome).sum();
-        gfx.drawString(this.font, "Daily village income: +" + totalDailyIncome, x, y, TEXT_COLOR);
+        long totFood = data.villages().stream().mapToLong(PolityViewPayload.VillageRow::incFood).sum();
+        long totMats = data.villages().stream().mapToLong(PolityViewPayload.VillageRow::incMaterials).sum();
+        long totGold = data.villages().stream().mapToLong(PolityViewPayload.VillageRow::incGold).sum();
+        gfx.drawString(this.font, String.format("Daily: %+d food  %+d materials  %+d gold", totFood, totMats, totGold), x, y, TEXT_COLOR);
         y += 12;
         gfx.drawString(this.font, String.format("Tax rate: %.0f%%  \u2022  Tribute rate: %.0f%%",
                 data.taxRate() * 100f, data.tributeRate() * 100f), x, y, LABEL_COLOR);
@@ -86,8 +88,13 @@ public class PolityScreen extends Screen {
         int maxVillages = Math.min(data.villages().size(), 10);
         for (int i = 0; i < maxVillages; i++) {
             PolityViewPayload.VillageRow v = data.villages().get(i);
-            String line = String.format("  %s   stockpile %d   %+d/day", v.name(), v.stockpile(), v.dailyIncome());
+            String line = String.format("  %s (%d plots)  F:%d M:%d G:%d",
+                    v.name(), v.plotCount(), v.food(), v.materials(), v.gold());
             gfx.drawString(this.font, line, x, y, TEXT_COLOR);
+            y += 11;
+            String incomeLine = String.format("    income: %+d food  %+d mat  %+d gold",
+                    v.incFood(), v.incMaterials(), v.incGold());
+            gfx.drawString(this.font, incomeLine, x, y, LABEL_COLOR);
             y += 11;
         }
         if (data.villages().size() > maxVillages) {

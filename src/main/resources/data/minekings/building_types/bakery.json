@@ -6,5 +6,9 @@
     "minecraft:cake": 1,
     "minecraft:smoker": 1
   },
-  "dailyIncome": 4.0
+  "dailyIncome": 4.0,
+  "produces": {
+    "food": 4.0
+  },
+  "consumes": {}
 }

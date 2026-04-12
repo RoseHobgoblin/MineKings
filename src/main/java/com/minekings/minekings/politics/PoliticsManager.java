@@ -2,6 +2,8 @@ package com.minekings.minekings.politics;
 
 import com.minekings.minekings.MineKings;
 import com.minekings.minekings.village.Building;
+import com.minekings.minekings.village.BuildingType;
+import com.minekings.minekings.village.BuildingTypes;
 import com.minekings.minekings.village.Village;
 import com.minekings.minekings.village.VillageManager;
 import com.minekings.minekings.village.util.MKWorldUtils;
@@ -263,6 +265,12 @@ public class PoliticsManager extends SavedData {
         );
         polity.addVillage(village.getId());
 
+        // 3b. Auto-migrate detected buildings into plots if the village
+        // doesn't have any yet (legacy v0.1-v0.4 villages).
+        if (village.getPlots().isEmpty() && !village.getBuildings().isEmpty()) {
+            migrateBuildingsToPlots(village);
+        }
+
         // 4. Generate founder character and wire it in.
         Character founder = generateCharacter(culture, currentDay, polityId);
         polity.setLeaderCharacterId(founder.getId());
@@ -296,21 +304,85 @@ public class PoliticsManager extends SavedData {
         return c;
     }
 
+    /**
+     * Converts a village's detected MCA-style {@link Building} records into
+     * {@link Plot} records. Each building becomes a BUILT plot at the
+     * building's source-block position. Called once during polity founding
+     * for legacy detected villages that have no plots yet.
+     */
+    private void migrateBuildingsToPlots(Village village) {
+        int plotId = 0;
+        for (Building b : village) {
+            Plot plot = new Plot(
+                    plotId++,
+                    b.getSourceBlock(),
+                    net.minecraft.core.Direction.NORTH, // legacy buildings don't track facing
+                    b.getType(),
+                    1 // tier 1
+            );
+            village.getPlots().add(plot);
+        }
+        MineKings.LOGGER.info("Migrated {} buildings to plots for village {}", village.getPlots().size(), village.getName());
+    }
+
     private String pickRandom(List<String> pool, String fallback) {
         if (pool == null || pool.isEmpty()) return fallback;
         return pool.get(world.random.nextInt(pool.size()));
     }
 
     /**
-     * Sums the {@code dailyIncome} of every building in the village,
-     * as defined in the building-type JSONs. Returns the rounded total.
+     * Computes per-resource daily income for a village. If the village has
+     * plots (v0.5+), reads from productive plots. Otherwise falls back to
+     * the old per-building {@code dailyIncome} mapped to GOLD.
      */
-    public static long computeVillageDailyIncome(Village village) {
-        double total = 0.0;
-        for (Building b : village) {
-            total += b.getBuildingType().dailyIncome();
+    public static Map<Resource, Long> computeVillageDailyIncome(Village village) {
+        Map<Resource, Double> totals = new java.util.EnumMap<>(Resource.class);
+        for (Resource r : Resource.values()) totals.put(r, 0.0);
+
+        if (!village.getPlots().isEmpty()) {
+            // Plots are authoritative
+            for (Plot plot : village.getPlots()) {
+                if (!plot.isProductive()) continue;
+                BuildingType bt = BuildingTypes.getInstance().getBuildingType(plot.getBuildingTypeId());
+                if (bt.hasResourceEconomy()) {
+                    for (Map.Entry<String, Double> entry : bt.produces().entrySet()) {
+                        Resource r = Resource.fromString(entry.getKey());
+                        if (r != null) totals.merge(r, entry.getValue(), Double::sum);
+                    }
+                    for (Map.Entry<String, Double> entry : bt.consumes().entrySet()) {
+                        Resource r = Resource.fromString(entry.getKey());
+                        if (r != null) totals.merge(r, -entry.getValue(), Double::sum);
+                    }
+                } else {
+                    // Fallback: old dailyIncome → GOLD
+                    totals.merge(Resource.GOLD, bt.dailyIncome(), Double::sum);
+                }
+            }
+        } else {
+            // Legacy path: no plots, use detected buildings
+            for (Building b : village) {
+                BuildingType bt = b.getBuildingType();
+                if (bt.hasResourceEconomy()) {
+                    for (Map.Entry<String, Double> entry : bt.produces().entrySet()) {
+                        Resource r = Resource.fromString(entry.getKey());
+                        if (r != null) totals.merge(r, entry.getValue(), Double::sum);
+                    }
+                    for (Map.Entry<String, Double> entry : bt.consumes().entrySet()) {
+                        Resource r = Resource.fromString(entry.getKey());
+                        if (r != null) totals.merge(r, -entry.getValue(), Double::sum);
+                    }
+                } else {
+                    totals.merge(Resource.GOLD, bt.dailyIncome(), Double::sum);
+                }
+            }
         }
-        return Math.round(total);
+
+        Map<Resource, Long> result = new java.util.EnumMap<>(Resource.class);
+        for (Map.Entry<Resource, Double> entry : totals.entrySet()) {
+            long rounded = Math.round(entry.getValue());
+            if (rounded != 0L) result.put(entry.getKey(), rounded);
+        }
+        return result;
     }
 
     // ----- Allegiance mutation -----
@@ -395,21 +467,29 @@ public class PoliticsManager extends SavedData {
 
         // 3. Economy pass: production → village stockpile → polity treasury → tribute
         VillageManager vmEcon = VillageManager.get(level);
-        // 3a. Buildings produce into village stockpiles
+        // 3a. Plots produce and consume per-resource into village stockpiles
         for (Village v : vmEcon) {
-            long income = computeVillageDailyIncome(v);
-            if (income != 0L) {
-                v.addStockpile(income);
+            Map<Resource, Long> income = computeVillageDailyIncome(v);
+            for (Map.Entry<Resource, Long> entry : income.entrySet()) {
+                if (entry.getValue() != 0L) {
+                    v.addStockpile(entry.getKey(), entry.getValue());
+                }
+            }
+            // Clamp stockpiles to zero floor (no negative stockpiles)
+            for (Resource r : Resource.values()) {
+                if (v.getStockpile(r) < 0L) v.setStockpile(r, 0L);
             }
         }
-        // 3b. Polity taxation — skim taxRate from each held village's stockpile
+        // 3b. Polity taxation — skim taxRate from each held village's GOLD + MATERIALS stockpile
         for (Polity p : polities.values()) {
             for (int villageId : p.getHeldVillageIds()) {
                 vmEcon.getOrEmpty(villageId).ifPresent(v -> {
-                    long skim = (long) Math.floor(v.getStockpile() * p.getTaxRate());
-                    if (skim > 0L) {
-                        v.addStockpile(-skim);
-                        p.addTreasury(skim);
+                    for (Resource r : new Resource[]{Resource.GOLD, Resource.MATERIALS}) {
+                        long skim = (long) Math.floor(v.getStockpile(r) * p.getTaxRate());
+                        if (skim > 0L) {
+                            v.addStockpile(r, -skim);
+                            p.addTreasury(skim);
+                        }
                     }
                 });
             }
@@ -541,16 +621,20 @@ public class PoliticsManager extends SavedData {
         if (e instanceof Villager v && !v.isRemoved()) {
             v.setCustomName(null);
             v.setCustomNameVisible(false);
+            v.getPersistentData().remove(NAMED_TAG);
         }
         setDirty();
     }
 
-    /** Applies the culture-appropriate leader title + character name to a villager. */
+    private static final String NAMED_TAG = "minekings_named";
+
+    /** Applies the culture-appropriate leader title + character name to a villager and marks it as MineKings-named. */
     public void refreshName(Polity p, Character c, Villager v) {
         String title = getLeaderTitle(p);
         Component name = Component.literal(title + " " + c.getName());
         v.setCustomName(name);
         v.setCustomNameVisible(true);
+        v.getPersistentData().putBoolean(NAMED_TAG, true);
     }
 
     /**
@@ -559,6 +643,30 @@ public class PoliticsManager extends SavedData {
      * villager in the polity's villages and bind it.
      */
     public void reconcileEmbodiments(ServerLevel level) {
+        // Stale-name cleanup: find any loaded villager with our tag that
+        // isn't currently bound and clear their custom name. This handles
+        // the case where a binding was cleared while the villager was in
+        // an unloaded chunk — the map entry is gone but the entity still
+        // carries the old name from its persisted NBT.
+        VillageManager vmClean = VillageManager.get(level);
+        for (Polity p2 : polities.values()) {
+            for (int villageId : p2.getHeldVillageIds()) {
+                vmClean.getOrEmpty(villageId).ifPresent(v -> {
+                    BoundingBox box = v.getBox().inflatedBy(16);
+                    AABB aabb = new AABB(box.minX(), box.minY(), box.minZ(),
+                            box.maxX() + 1, box.maxY() + 1, box.maxZ() + 1);
+                    for (Villager vil : level.getEntitiesOfClass(Villager.class, aabb)) {
+                        if (vil.getPersistentData().getBoolean(NAMED_TAG)
+                                && !embodiedBy.containsKey(vil.getUUID())) {
+                            vil.setCustomName(null);
+                            vil.setCustomNameVisible(false);
+                            vil.getPersistentData().remove(NAMED_TAG);
+                        }
+                    }
+                });
+            }
+        }
+
         for (Polity p : polities.values()) {
             int characterId = p.getLeaderCharacterId();
             if (characterId == Polity.LEADER_VACANT) continue; // succession runs on dayTick

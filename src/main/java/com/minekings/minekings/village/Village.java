@@ -7,6 +7,8 @@
  */
 package com.minekings.minekings.village;
 
+import com.minekings.minekings.politics.Plot;
+import com.minekings.minekings.politics.Resource;
 import com.minekings.minekings.village.util.MKNbtHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
@@ -20,8 +22,11 @@ import net.minecraft.world.entity.ai.village.poi.PoiTypes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -51,7 +56,8 @@ public class Village implements Iterable<Building> {
     private int beds;
     private long lastBedSync;
     private boolean autoScan = false;
-    private long stockpile = 0L;
+    private final Map<Resource, Long> stockpile = new EnumMap<>(Resource.class);
+    private final List<Plot> plots = new ArrayList<>();
     private BoundingBox box = new BoundingBox(0, 0, 0, 0, 0, 0);
 
     public Village(int id, ServerLevel world) {
@@ -64,7 +70,24 @@ public class Village implements Iterable<Building> {
         this.id = v.getInt("id");
         this.name = v.getString("name");
         this.beds = v.getInt("beds");
-        this.stockpile = v.contains("stockpile") ? v.getLong("stockpile") : 0L;
+        // Load per-resource stockpile (v0.5+), with backwards compat for the old single-long "stockpile" field
+        if (v.contains("stockpileMap")) {
+            CompoundTag sm = v.getCompound("stockpileMap");
+            for (Resource r : Resource.values()) {
+                String key = r.name().toLowerCase();
+                if (sm.contains(key)) stockpile.put(r, sm.getLong(key));
+            }
+        } else if (v.contains("stockpile")) {
+            // Migrate old single-value stockpile → GOLD for backwards compat
+            stockpile.put(Resource.GOLD, v.getLong("stockpile"));
+        }
+        // Load plots
+        if (v.contains("plots")) {
+            ListTag plotList = v.getList("plots", Tag.TAG_COMPOUND);
+            for (int i = 0; i < plotList.size(); i++) {
+                plots.add(new Plot(plotList.getCompound(i)));
+            }
+        }
         this.world = world;
         if (v.contains("autoScan")) {
             this.autoScan = v.getBoolean("autoScan");
@@ -226,15 +249,49 @@ public class Village implements Iterable<Building> {
         v.putInt("id", id);
         v.putString("name", name);
         v.putInt("beds", beds);
-        v.putLong("stockpile", stockpile);
+        // Save per-resource stockpile
+        CompoundTag sm = new CompoundTag();
+        for (Map.Entry<Resource, Long> entry : stockpile.entrySet()) {
+            sm.putLong(entry.getKey().name().toLowerCase(), entry.getValue());
+        }
+        v.put("stockpileMap", sm);
+        // Save plots
+        ListTag plotList = new ListTag();
+        for (Plot p : plots) plotList.add(p.save());
+        v.put("plots", plotList);
         v.put("buildings", MKNbtHelper.fromList(buildings.values(), Building::save));
         v.putBoolean("autoScan", autoScan);
         return v;
     }
 
-    public long getStockpile() { return stockpile; }
-    public void setStockpile(long stockpile) { this.stockpile = stockpile; }
-    public void addStockpile(long delta) { this.stockpile += delta; }
+    // ----- Per-resource stockpile accessors -----
+
+    public Map<Resource, Long> getStockpileMap() { return stockpile; }
+
+    public long getStockpile(Resource r) {
+        return stockpile.getOrDefault(r, 0L);
+    }
+
+    public void setStockpile(Resource r, long amount) {
+        stockpile.put(r, amount);
+    }
+
+    public void addStockpile(Resource r, long delta) {
+        stockpile.merge(r, delta, Long::sum);
+    }
+
+    /** Sum of all resource stockpiles — used for backwards-compatible display. */
+    public long getTotalStockpile() {
+        return stockpile.values().stream().mapToLong(Long::longValue).sum();
+    }
+
+    // ----- Plot accessors -----
+
+    public List<Plot> getPlots() { return plots; }
+
+    public Optional<Plot> getPlot(int plotId) {
+        return plots.stream().filter(p -> p.getId() == plotId).findFirst();
+    }
 
     public void merge(Village village) {
         buildings.putAll(village.buildings);

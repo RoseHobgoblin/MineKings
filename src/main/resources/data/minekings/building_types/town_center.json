@@ -11,5 +11,9 @@
   "iconV": 0,
   "grouped": true,
   "mergeRange": 32,
-  "dailyIncome": 2.0
+  "dailyIncome": 2.0,
+  "produces": {
+    "gold": 2.0
+  },
+  "consumes": {}
 }

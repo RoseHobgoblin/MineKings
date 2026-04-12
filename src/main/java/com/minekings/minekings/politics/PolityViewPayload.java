@@ -53,8 +53,13 @@ public record PolityViewPayload(
         buf.writeVarInt(p.villages.size());
         for (VillageRow v : p.villages) {
             buf.writeUtf(v.name);
-            buf.writeLong(v.stockpile);
-            buf.writeLong(v.dailyIncome);
+            buf.writeLong(v.food);
+            buf.writeLong(v.materials);
+            buf.writeLong(v.gold);
+            buf.writeLong(v.incFood);
+            buf.writeLong(v.incMaterials);
+            buf.writeLong(v.incGold);
+            buf.writeVarInt(v.plotCount);
         }
 
         buf.writeVarInt(p.vassals.size());
@@ -78,7 +83,12 @@ public record PolityViewPayload(
         int villageCount = buf.readVarInt();
         List<VillageRow> villages = new ArrayList<>(villageCount);
         for (int i = 0; i < villageCount; i++) {
-            villages.add(new VillageRow(buf.readUtf(), buf.readLong(), buf.readLong()));
+            villages.add(new VillageRow(
+                    buf.readUtf(),
+                    buf.readLong(), buf.readLong(), buf.readLong(),
+                    buf.readLong(), buf.readLong(), buf.readLong(),
+                    buf.readVarInt()
+            ));
         }
 
         int vassalCount = buf.readVarInt();
@@ -94,6 +104,8 @@ public record PolityViewPayload(
         );
     }
 
-    public record VillageRow(String name, long stockpile, long dailyIncome) {}
+    /** Per-village economic summary carried in the payload. */
+    public record VillageRow(String name, long food, long materials, long gold,
+                             long incFood, long incMaterials, long incGold, int plotCount) {}
     public record VassalRow(String displayName, String leaderTitleName) {}
 }

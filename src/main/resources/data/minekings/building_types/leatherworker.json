@@ -5,5 +5,9 @@
   "blocks": {
     "#minecraft:cauldrons": 1
   },
-  "dailyIncome": 1.5
+  "dailyIncome": 1.5,
+  "produces": {
+    "materials": 2.0
+  },
+  "consumes": {}
 }

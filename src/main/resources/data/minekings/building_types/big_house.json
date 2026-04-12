@@ -7,5 +7,9 @@
   },
   "iconU": 4,
   "iconV": 1,
-  "dailyIncome": 1.0
+  "dailyIncome": 1.0,
+  "produces": {},
+  "consumes": {
+    "food": 2.0
+  }
 }

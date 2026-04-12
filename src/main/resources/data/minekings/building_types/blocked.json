@@ -6,5 +6,7 @@
     "blocked": 1
   },
   "noBeds": true,
-  "dailyIncome": 0.0
+  "dailyIncome": 0.0,
+  "produces": {},
+  "consumes": {}
 }

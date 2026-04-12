@@ -40,6 +40,10 @@ public final class BuildingType {
                 buf.writeVarInt(buildingType.mergeRange);
                 buf.writeDouble(buildingType.dailyIncome);
 
+                // Serialize produces/consumes maps
+                writeStringDoubleMap(buf, buildingType.produces);
+                writeStringDoubleMap(buf, buildingType.consumes);
+
                 // Serialize blocks map
                 buf.writeVarInt(buildingType.blocks.size());
                 buildingType.blocks.forEach((key, value) -> {
@@ -61,6 +65,9 @@ public final class BuildingType {
                 int mergeRange = buf.readVarInt();
                 double dailyIncome = buf.readDouble();
 
+                Map<String, Double> produces = readStringDoubleMap(buf);
+                Map<String, Double> consumes = readStringDoubleMap(buf);
+
                 // Deserialize blocks map
                 int blocksSize = buf.readVarInt();
                 Map<String, Integer> blocks = new HashMap<>(blocksSize);
@@ -68,9 +75,21 @@ public final class BuildingType {
                     blocks.put(buf.readUtf(), buf.readVarInt());
                 }
 
-                return new BuildingType(name, margin, color, priority, visible, noBeds, icon, iconU, iconV, grouped, mergeRange, dailyIncome, blocks);
+                return new BuildingType(name, margin, color, priority, visible, noBeds, icon, iconU, iconV, grouped, mergeRange, dailyIncome, produces, consumes, blocks);
             }
     );
+
+    private static void writeStringDoubleMap(net.minecraft.network.FriendlyByteBuf buf, Map<String, Double> map) {
+        buf.writeVarInt(map.size());
+        map.forEach((k, v) -> { buf.writeUtf(k); buf.writeDouble(v); });
+    }
+
+    private static Map<String, Double> readStringDoubleMap(net.minecraft.network.FriendlyByteBuf buf) {
+        int size = buf.readVarInt();
+        Map<String, Double> map = new HashMap<>(size);
+        for (int i = 0; i < size; i++) map.put(buf.readUtf(), buf.readDouble());
+        return map;
+    }
     private final String name;
     private final int margin;
     private final String color;
@@ -84,12 +103,17 @@ public final class BuildingType {
     private final boolean grouped;
     private final int mergeRange;
     private final double dailyIncome;
+    /** Per-resource production per day. Keys are lowercase resource names ("food", "materials", "gold"). */
+    private final Map<String, Double> produces;
+    /** Per-resource consumption per day. Same key format as produces. */
+    private final Map<String, Double> consumes;
     private transient Map<ResourceLocation, ResourceLocation> blockToGroup;
     private transient Map<ResourceLocation, Integer> groups;
 
-    // Private constructor for deserialization
+    // Private constructor for network deserialization
     private BuildingType(String name, int margin, String color, int priority, boolean visible, boolean noBeds,
-                         boolean icon, int iconU, int iconV, boolean grouped, int mergeRange, double dailyIncome, Map<String, Integer> blocks) {
+                         boolean icon, int iconU, int iconV, boolean grouped, int mergeRange, double dailyIncome,
+                         Map<String, Double> produces, Map<String, Double> consumes, Map<String, Integer> blocks) {
         this.name = name;
         this.margin = margin;
         this.color = color;
@@ -102,6 +126,8 @@ public final class BuildingType {
         this.grouped = grouped;
         this.mergeRange = mergeRange;
         this.dailyIncome = dailyIncome;
+        this.produces = produces;
+        this.consumes = consumes;
         this.blocks = blocks;
     }
 
@@ -120,6 +146,8 @@ public final class BuildingType {
         this.grouped = false;
         this.mergeRange = 32;
         this.dailyIncome = 0.0;
+        this.produces = Map.of();
+        this.consumes = Map.of();
     }
 
     public BuildingType(String name, JsonObject value) {
@@ -137,6 +165,21 @@ public final class BuildingType {
         this.grouped = GsonHelper.getAsBoolean(value, "grouped", false);
         this.mergeRange = GsonHelper.getAsInt(value, "mergeRange", 0);
         this.dailyIncome = value.has("dailyIncome") ? value.get("dailyIncome").getAsDouble() : 0.0;
+
+        this.produces = new HashMap<>();
+        if (GsonHelper.isObjectNode(value, "produces")) {
+            JsonObject prod = GsonHelper.getAsJsonObject(value, "produces");
+            for (Map.Entry<String, JsonElement> entry : prod.entrySet()) {
+                this.produces.put(entry.getKey(), entry.getValue().getAsDouble());
+            }
+        }
+        this.consumes = new HashMap<>();
+        if (GsonHelper.isObjectNode(value, "consumes")) {
+            JsonObject cons = GsonHelper.getAsJsonObject(value, "consumes");
+            for (Map.Entry<String, JsonElement> entry : cons.entrySet()) {
+                this.consumes.put(entry.getKey(), entry.getValue().getAsDouble());
+            }
+        }
 
         this.blocks = new HashMap<>();
         if (GsonHelper.isObjectNode(value, "blocks")) {
@@ -266,5 +309,16 @@ public final class BuildingType {
 
     public double dailyIncome() {
         return dailyIncome;
+    }
+
+    /** Per-resource production per day. Keys are lowercase resource names. */
+    public Map<String, Double> produces() { return produces; }
+
+    /** Per-resource consumption per day. Keys are lowercase resource names. */
+    public Map<String, Double> consumes() { return consumes; }
+
+    /** True if this building type has explicit per-resource produces/consumes data (v0.5+). */
+    public boolean hasResourceEconomy() {
+        return !produces.isEmpty() || !consumes.isEmpty();
     }
 }

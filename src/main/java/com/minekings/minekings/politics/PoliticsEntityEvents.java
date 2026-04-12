@@ -90,8 +90,17 @@ public final class PoliticsEntityEvents {
         List<PolityViewPayload.VillageRow> villages = new ArrayList<>();
         for (int villageId : polity.getHeldVillageIds()) {
             vm.getOrEmpty(villageId).ifPresent(v -> {
-                long income = PoliticsManager.computeVillageDailyIncome(v);
-                villages.add(new PolityViewPayload.VillageRow(v.getName(), v.getStockpile(), income));
+                java.util.Map<Resource, Long> income = PoliticsManager.computeVillageDailyIncome(v);
+                villages.add(new PolityViewPayload.VillageRow(
+                        v.getName(),
+                        v.getStockpile(Resource.FOOD),
+                        v.getStockpile(Resource.MATERIALS),
+                        v.getStockpile(Resource.GOLD),
+                        income.getOrDefault(Resource.FOOD, 0L),
+                        income.getOrDefault(Resource.MATERIALS, 0L),
+                        income.getOrDefault(Resource.GOLD, 0L),
+                        v.getPlots().size()
+                ));
             });
         }
 

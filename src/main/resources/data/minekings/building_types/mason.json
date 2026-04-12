@@ -5,5 +5,9 @@
   "blocks": {
     "minecraft:stonecutter": 1
   },
-  "dailyIncome": 1.5
+  "dailyIncome": 1.5,
+  "produces": {
+    "materials": 3.0
+  },
+  "consumes": {}
 }

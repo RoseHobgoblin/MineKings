@@ -9,5 +9,9 @@
   },
   "iconU": 1,
   "iconV": 1,
-  "dailyIncome": 1.0
+  "dailyIncome": 1.0,
+  "produces": {
+    "gold": 1.0
+  },
+  "consumes": {}
 }

@@ -5,5 +5,9 @@
   "blocks": {
     "#minecraft:beds": 1
   },
-  "dailyIncome": 1.0
+  "dailyIncome": 1.0,
+  "produces": {},
+  "consumes": {
+    "food": 1.0
+  }
 }

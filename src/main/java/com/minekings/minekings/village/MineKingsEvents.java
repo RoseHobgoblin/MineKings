@@ -4,9 +4,13 @@ import com.minekings.minekings.MineKings;
 import com.minekings.minekings.politics.CultureManager;
 import com.minekings.minekings.politics.PoliticsCommands;
 import com.minekings.minekings.politics.PoliticsManager;
+import com.minekings.minekings.village.layout.*;
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -93,6 +97,17 @@ public final class MineKingsEvents {
                 .then(Commands.literal("scan")
                         .requires(src -> src.hasPermission(2))
                         .executes(MineKingsEvents::forceScan))
+                .then(Commands.literal("village")
+                        .then(Commands.literal("layout")
+                                .requires(src -> src.hasPermission(2))
+                                .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                        .then(Commands.argument("level", IntegerArgumentType.integer(0, 5))
+                                                .executes(MineKingsEvents::villageLayout))))
+                        .then(Commands.literal("generate")
+                                .requires(src -> src.hasPermission(2))
+                                .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                        .then(Commands.argument("level", IntegerArgumentType.integer(0, 5))
+                                                .executes(MineKingsEvents::villageGenerate)))))
                 .then(PoliticsCommands.build());
         event.getDispatcher().register(root);
     }
@@ -176,6 +191,108 @@ public final class MineKingsEvents {
         for (Village ignored : manager) villageCount++;
         int finalVillageCount = villageCount;
         src.sendSuccess(() -> Component.literal("Villages now registered: " + finalVillageCount), false);
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Runs the Village Layout Engine at the given coordinates and development
+     * level, printing the resulting layout plan to chat. Pure data — no blocks
+     * are placed.
+     */
+    private static int villageLayout(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        ServerLevel level = src.getLevel();
+        BlockPos argPos = BlockPosArgument.getBlockPos(ctx, "pos");
+        int x = argPos.getX();
+        int z = argPos.getZ();
+        int devLevel = IntegerArgumentType.getInteger(ctx, "level");
+
+        BlockPos center = new BlockPos(x, level.getHeight(
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, x, z) - 1, z);
+
+        src.sendSuccess(() -> Component.literal("[VLE] Analyzing terrain at " +
+                center.toShortString() + " radius=" + TerrainAnalyzer.DEFAULT_RADIUS + "...")
+                .withStyle(ChatFormatting.GOLD), false);
+
+        TerrainProfile profile = TerrainAnalyzer.analyze(level, center, TerrainAnalyzer.DEFAULT_RADIUS);
+
+        src.sendSuccess(() -> Component.literal("[VLE] Peak: " + profile.peak().toShortString() +
+                "  Flat zones: " + profile.flatZones().size() +
+                "  Water: " + profile.waterPositions().size() +
+                "  Biome: " + profile.biome()), false);
+
+        long seed = ((long) x * 341873128712L) + ((long) z * 132897987541L);
+        VillageLayout layout = VillageLayoutEngine.generate(profile, devLevel, seed);
+
+        // Print summary
+        src.sendSuccess(() -> Component.literal(String.format(
+                "[VLE] Level %d layout: %d plots, %d roads, pop ~%d, perimeter=%d",
+                layout.developmentLevel(), layout.plots().size(), layout.roads().size(),
+                layout.estimatedPopulation(), layout.perimeterRadius()))
+                .withStyle(ChatFormatting.GREEN), false);
+
+        // Print plots
+        for (PlotAssignment p : layout.plots()) {
+            src.sendSuccess(() -> Component.literal(String.format(
+                    "  #%d %s at %s facing %s (%dx%d)",
+                    p.plotId(), p.buildingRole(), p.origin().toShortString(),
+                    p.facing().getName(), p.footprintX(), p.footprintZ())), false);
+        }
+
+        // Print roads
+        for (RoadSegment r : layout.roads()) {
+            src.sendSuccess(() -> Component.literal(String.format(
+                    "  road w=%d: %s -> %s (%.0f blocks)",
+                    r.width(), r.start().toShortString(), r.end().toShortString(),
+                    r.length())), false);
+        }
+
+        // Print gates
+        if (!layout.gatePositions().isEmpty()) {
+            for (BlockPos gate : layout.gatePositions()) {
+                src.sendSuccess(() -> Component.literal(
+                        "  gate at " + gate.toShortString()), false);
+            }
+        }
+
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Runs the VLE and then physically places the village in the world
+     * using colored wool placeholder buildings and dirt_path roads.
+     */
+    private static int villageGenerate(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack src = ctx.getSource();
+        ServerLevel level = src.getLevel();
+        BlockPos argPos = BlockPosArgument.getBlockPos(ctx, "pos");
+        int x = argPos.getX();
+        int z = argPos.getZ();
+        int devLevel = IntegerArgumentType.getInteger(ctx, "level");
+
+        BlockPos center = new BlockPos(x, level.getHeight(
+                net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING, x, z) - 1, z);
+
+        src.sendSuccess(() -> Component.literal("[VLE] Analyzing terrain...")
+                .withStyle(ChatFormatting.GOLD), false);
+
+        TerrainProfile profile = TerrainAnalyzer.analyze(level, center, TerrainAnalyzer.DEFAULT_RADIUS);
+
+        long seed = ((long) x * 341873128712L) + ((long) z * 132897987541L);
+        VillageLayout layout = VillageLayoutEngine.generate(profile, devLevel, seed);
+
+        src.sendSuccess(() -> Component.literal(String.format(
+                "[VLE] Placing level-%d village: %d plots, %d roads...",
+                layout.developmentLevel(), layout.plots().size(), layout.roads().size()))
+                .withStyle(ChatFormatting.GOLD), false);
+
+        StructurePlacer.place(level, layout, profile);
+
+        src.sendSuccess(() -> Component.literal(String.format(
+                "[VLE] Done! %d buildings placed, %d road segments, pop ~%d",
+                layout.plots().size(), layout.roads().size(), layout.estimatedPopulation()))
+                .withStyle(ChatFormatting.GREEN), false);
 
         return Command.SINGLE_SUCCESS;
     }

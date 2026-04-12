@@ -195,8 +195,15 @@ public final class PoliticsCommands {
                 .map(vid -> {
                     Optional<Village> v = vm.getOrEmpty(vid);
                     return v.map(value -> {
-                        long income = PoliticsManager.computeVillageDailyIncome(value);
-                        return String.format("  #%d %s  stockpile=%d  %+d/day", vid, value.getName(), value.getStockpile(), income);
+                        java.util.Map<Resource, Long> income = PoliticsManager.computeVillageDailyIncome(value);
+                        return String.format("  #%d %s (%d plots)  F:%d M:%d G:%d  inc: %+dF %+dM %+dG",
+                                vid, value.getName(), value.getPlots().size(),
+                                value.getStockpile(Resource.FOOD),
+                                value.getStockpile(Resource.MATERIALS),
+                                value.getStockpile(Resource.GOLD),
+                                income.getOrDefault(Resource.FOOD, 0L),
+                                income.getOrDefault(Resource.MATERIALS, 0L),
+                                income.getOrDefault(Resource.GOLD, 0L));
                     }).orElseGet(() -> "  #" + vid + " (missing)");
                 })
                 .collect(Collectors.toList());
