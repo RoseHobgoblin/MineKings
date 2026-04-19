@@ -189,20 +189,30 @@ public final class PoliticsCommands {
             src.sendSuccess(() -> Component.literal("Leader: (vacant)"), false);
         }
 
-        // Held villages
+        // Held villages with per-resource state
         VillageManager vm = VillageManager.get(level);
-        List<String> villageLines = p.getHeldVillageIds().stream()
-                .map(vid -> {
-                    Optional<Village> v = vm.getOrEmpty(vid);
-                    return v.map(value -> {
-                        long income = PoliticsManager.computeVillageDailyIncome(value);
-                        return String.format("  #%d %s  stockpile=%d  %+d/day", vid, value.getName(), value.getStockpile(), income);
-                    }).orElseGet(() -> "  #" + vid + " (missing)");
-                })
-                .collect(Collectors.toList());
         src.sendSuccess(() -> Component.literal("Villages (" + p.getHeldVillageIds().size() + "):"), false);
-        for (String vl : villageLines) {
-            src.sendSuccess(() -> Component.literal(vl), false);
+        for (int vid : p.getHeldVillageIds()) {
+            Optional<Village> vOpt = vm.getOrEmpty(vid);
+            if (vOpt.isEmpty()) {
+                src.sendSuccess(() -> Component.literal("  #" + vid + " (missing)"), false);
+                continue;
+            }
+            Village value = vOpt.get();
+            String line1 = String.format("  #%d %s  pop=%d", vid, value.getName(), value.getPopulation());
+            String line2 = String.format("    food=%d mats=%d gold=%d",
+                    value.getFood(), value.getMaterials(), value.getGold());
+            String line3 = String.format("    baseline: +%d food +%d mats +%d gold /day",
+                    PoliticsManager.computeVillageBaselineFood(value),
+                    PoliticsManager.computeVillageBaselineMaterials(value),
+                    PoliticsManager.computeVillageBaselineGold(value));
+            String line4 = value.getAttributes().isEmpty()
+                    ? "    attributes: (none)"
+                    : "    attributes: " + String.join(", ", value.getAttributes());
+            src.sendSuccess(() -> Component.literal(line1), false);
+            src.sendSuccess(() -> Component.literal(line2), false);
+            src.sendSuccess(() -> Component.literal(line3), false);
+            src.sendSuccess(() -> Component.literal(line4), false);
         }
 
         // Liege

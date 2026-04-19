@@ -89,10 +89,17 @@ public final class PoliticsEntityEvents {
         VillageManager vm = VillageManager.get(level);
         List<PolityViewPayload.VillageRow> villages = new ArrayList<>();
         for (int villageId : polity.getHeldVillageIds()) {
-            vm.getOrEmpty(villageId).ifPresent(v -> {
-                long income = PoliticsManager.computeVillageDailyIncome(v);
-                villages.add(new PolityViewPayload.VillageRow(v.getName(), v.getStockpile(), income));
-            });
+            vm.getOrEmpty(villageId).ifPresent(v -> villages.add(new PolityViewPayload.VillageRow(
+                    v.getName(),
+                    v.getPopulation(),
+                    v.getFood(),
+                    v.getMaterials(),
+                    v.getGold(),
+                    PoliticsManager.computeVillageBaselineFood(v),
+                    PoliticsManager.computeVillageBaselineMaterials(v),
+                    PoliticsManager.computeVillageBaselineGold(v),
+                    new ArrayList<>(v.getAttributes())
+            )));
         }
 
         // Vassal rows

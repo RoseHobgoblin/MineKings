@@ -5,6 +5,5 @@
   "blocks": {
     "blocked": 1
   },
-  "noBeds": true,
-  "dailyIncome": 0.0
+  "noBeds": true
 }

@@ -1,8 +1,11 @@
 package com.minekings.minekings.politics;
 
 import com.minekings.minekings.MineKings;
+import com.minekings.minekings.economy.EconomyRules;
+import com.minekings.minekings.economy.StorehouseDrain;
 import com.minekings.minekings.village.Building;
 import com.minekings.minekings.village.Village;
+import com.minekings.minekings.village.VillageAttributes;
 import com.minekings.minekings.village.VillageManager;
 import com.minekings.minekings.village.util.MKWorldUtils;
 import net.minecraft.ChatFormatting;
@@ -302,15 +305,22 @@ public class PoliticsManager extends SavedData {
     }
 
     /**
-     * Sums the {@code dailyIncome} of every building in the village,
-     * as defined in the building-type JSONs. Returns the rounded total.
+     * Snapshot of a village's expected daily GOLD income (baseline only,
+     * not counting storehouse contributions which vary per day).
+     * Used by the PolityScreen/info to show a rough daily gold estimate.
      */
-    public static long computeVillageDailyIncome(Village village) {
-        double total = 0.0;
-        for (Building b : village) {
-            total += b.getBuildingType().dailyIncome();
-        }
-        return Math.round(total);
+    public static long computeVillageBaselineGold(Village village) {
+        return (long) Math.round(EconomyRules.baselineProduction(village).gold);
+    }
+
+    /** Baseline daily food income from attributes (no storehouse, no consumption). */
+    public static long computeVillageBaselineFood(Village village) {
+        return (long) Math.round(EconomyRules.baselineProduction(village).food);
+    }
+
+    /** Baseline daily materials income from attributes. */
+    public static long computeVillageBaselineMaterials(Village village) {
+        return (long) Math.round(EconomyRules.baselineProduction(village).materials);
     }
 
     // ----- Allegiance mutation -----
@@ -393,29 +403,79 @@ public class PoliticsManager extends SavedData {
             }
         }
 
-        // 3. Economy pass: production → village stockpile → polity treasury → tribute
+        // 3. Economy pass: attributes → baseline → storehouse drain → consumption → pop dynamics → tax → tribute
         VillageManager vmEcon = VillageManager.get(level);
-        // 3a. Buildings produce into village stockpiles
+
+        // 3a. Refresh each village's attribute set from its detected buildings.
         for (Village v : vmEcon) {
-            long income = computeVillageDailyIncome(v);
-            if (income != 0L) {
-                v.addStockpile(income);
+            VillageAttributes.refresh(v);
+        }
+
+        // 3b. Baseline production (from attributes) into per-resource stockpiles.
+        for (Village v : vmEcon) {
+            EconomyRules.Delta baseline = EconomyRules.baselineProduction(v);
+            v.addFood((long) Math.round(baseline.food));
+            v.addMaterials((long) Math.round(baseline.materials));
+            v.addGold((long) Math.round(baseline.gold));
+        }
+
+        // 3c. Storehouse drain — iterate each village's detected "storage" buildings,
+        // pull convertible items out of the chests inside them, add to stockpiles.
+        for (Village v : vmEcon) {
+            StorehouseDrain.drainAll(level, v);
+        }
+
+        // 3d. Consumption — population eats food. Starvation shrinks population.
+        for (Village v : vmEcon) {
+            long consumed = (long) Math.ceil(EconomyRules.dailyFoodConsumption(v));
+            if (consumed > 0L) {
+                if (v.getFood() >= consumed) {
+                    v.addFood(-consumed);
+                } else {
+                    // Partial starvation — eat what's available, lose population.
+                    v.setFood(0L);
+                    if (v.getPopulation() > 0) {
+                        v.addPopulation(-EconomyRules.STARVATION_LOSS_PER_DAY);
+                    }
+                }
             }
         }
-        // 3b. Polity taxation — skim taxRate from each held village's stockpile
+
+        // 3e. Population growth — food surplus greater than threshold days grows pop.
+        for (Village v : vmEcon) {
+            if (v.getPopulation() <= 0) continue;
+            long needed = (long) Math.ceil(
+                    EconomyRules.FOOD_CONSUMPTION_PER_POP * v.getPopulation() * EconomyRules.GROWTH_THRESHOLD_DAYS
+            );
+            int growths = 0;
+            while (v.getFood() >= needed && growths < EconomyRules.MAX_GROWTH_PER_DAY) {
+                long cost = (long) Math.ceil(
+                        EconomyRules.FOOD_CONSUMPTION_PER_POP * v.getPopulation() * EconomyRules.GROWTH_FOOD_COST_MULT
+                );
+                v.addFood(-cost);
+                v.addPopulation(1);
+                growths++;
+                needed = (long) Math.ceil(
+                        EconomyRules.FOOD_CONSUMPTION_PER_POP * v.getPopulation() * EconomyRules.GROWTH_THRESHOLD_DAYS
+                );
+            }
+        }
+
+        // 3f. Polity taxation — skim taxRate from each held village's GOLD (food/materials stay local).
         for (Polity p : polities.values()) {
             for (int villageId : p.getHeldVillageIds()) {
                 vmEcon.getOrEmpty(villageId).ifPresent(v -> {
-                    long skim = (long) Math.floor(v.getStockpile() * p.getTaxRate());
+                    long skim = (long) Math.floor(v.getGold() * p.getTaxRate());
                     if (skim > 0L) {
-                        v.addStockpile(-skim);
+                        v.addGold(-skim);
                         p.addTreasury(skim);
                     }
                 });
             }
         }
-        vmEcon.setDirty(); // village stockpiles changed
-        // 3c. Tribute flow — vassal treasury → lord treasury
+        vmEcon.setDirty(); // village state changed
+
+        // 3g. Tribute flow — vassal treasury → lord treasury.
         for (Allegiance a : allegiances) {
             Polity vassal = polities.get(a.vassalPolityId());
             Polity lord = polities.get(a.lordPolityId());

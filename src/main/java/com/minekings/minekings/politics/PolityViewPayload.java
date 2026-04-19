@@ -53,8 +53,15 @@ public record PolityViewPayload(
         buf.writeVarInt(p.villages.size());
         for (VillageRow v : p.villages) {
             buf.writeUtf(v.name);
-            buf.writeLong(v.stockpile);
-            buf.writeLong(v.dailyIncome);
+            buf.writeVarInt(v.population);
+            buf.writeLong(v.food);
+            buf.writeLong(v.materials);
+            buf.writeLong(v.gold);
+            buf.writeLong(v.baselineFood);
+            buf.writeLong(v.baselineMaterials);
+            buf.writeLong(v.baselineGold);
+            buf.writeVarInt(v.attributes.size());
+            for (String a : v.attributes) buf.writeUtf(a);
         }
 
         buf.writeVarInt(p.vassals.size());
@@ -78,7 +85,18 @@ public record PolityViewPayload(
         int villageCount = buf.readVarInt();
         List<VillageRow> villages = new ArrayList<>(villageCount);
         for (int i = 0; i < villageCount; i++) {
-            villages.add(new VillageRow(buf.readUtf(), buf.readLong(), buf.readLong()));
+            String vname = buf.readUtf();
+            int pop = buf.readVarInt();
+            long food = buf.readLong();
+            long mats = buf.readLong();
+            long gold = buf.readLong();
+            long bFood = buf.readLong();
+            long bMats = buf.readLong();
+            long bGold = buf.readLong();
+            int attrCount = buf.readVarInt();
+            List<String> attrs = new ArrayList<>(attrCount);
+            for (int k = 0; k < attrCount; k++) attrs.add(buf.readUtf());
+            villages.add(new VillageRow(vname, pop, food, mats, gold, bFood, bMats, bGold, attrs));
         }
 
         int vassalCount = buf.readVarInt();
@@ -94,6 +112,18 @@ public record PolityViewPayload(
         );
     }
 
-    public record VillageRow(String name, long stockpile, long dailyIncome) {}
+    /** One row per village held by the polity. Carries economic snapshot + baseline. */
+    public record VillageRow(
+            String name,
+            int population,
+            long food,
+            long materials,
+            long gold,
+            long baselineFood,
+            long baselineMaterials,
+            long baselineGold,
+            List<String> attributes
+    ) {}
+
     public record VassalRow(String displayName, String leaderTitleName) {}
 }

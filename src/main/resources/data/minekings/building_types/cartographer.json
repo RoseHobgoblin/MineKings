@@ -4,6 +4,5 @@
   "priority": 1,
   "blocks": {
     "minecraft:cartography_table": 1
-  },
-  "dailyIncome": 2.0
+  }
 }

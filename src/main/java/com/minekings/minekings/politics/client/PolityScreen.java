@@ -7,14 +7,15 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Read-only info screen for a polity. Opened by right-clicking a bound
- * leader villager. Displays the polity's political state and economic
- * summary as a simple text panel — no buttons, no inputs.
+ * leader villager. Shows political identity + per-village economic state
+ * with a three-resource breakdown (food / materials / gold) and the
+ * baseline income per village.
  *
  * <p>Data is a snapshot carried by {@link PolityViewPayload}; close and
- * reopen for fresh data. No ongoing sync.
+ * reopen for fresh data.
  */
 public class PolityScreen extends Screen {
-    private static final int PANEL_WIDTH = 260;
+    private static final int PANEL_WIDTH = 320;
     private static final int TEXT_COLOR = 0xFFFFFF;
     private static final int LABEL_COLOR = 0xAAAAAA;
     private static final int GOLD_COLOR = 0xFFAA00;
@@ -37,10 +38,9 @@ public class PolityScreen extends Screen {
     }
 
     private int estimateHeight() {
-        // rough estimate: header(3 lines) + separator + economy(3) + separator
-        // + villages(1 + count) + separator + vassals(1 + count) + separator + liege(1)
-        int lines = 3 + 3 + 1 + data.villages().size() + 1 + data.vassals().size() + 1;
-        return lines * 12 + 30; // 12px per line + padding for separators
+        // header(3) + sep + economy(3) + sep + villages(1 + 3*count) + sep + vassals(1 + count) + sep + liege(1)
+        int lines = 3 + 3 + 1 + data.villages().size() * 3 + 1 + Math.max(1, data.vassals().size()) + 1;
+        return lines * 12 + 40;
     }
 
     @Override
@@ -62,41 +62,43 @@ public class PolityScreen extends Screen {
         gfx.drawCenteredString(this.font, data.cultureName() + " culture \u2022 founded day " + data.foundedOnDay(), this.width / 2, y, LABEL_COLOR);
         y += 14;
 
-        // === Separator ===
         gfx.fill(x, y, rightX, y + 1, SEPARATOR_COLOR);
         y += 6;
 
-        // === Economy ===
-        gfx.drawString(this.font, "Treasury: " + data.treasury() + " gold", x, y, TEXT_COLOR);
+        // === Polity summary ===
+        gfx.drawString(this.font, "Treasury: " + data.treasury() + " gold", x, y, GOLD_COLOR);
         y += 12;
-        long totalDailyIncome = data.villages().stream().mapToLong(PolityViewPayload.VillageRow::dailyIncome).sum();
-        gfx.drawString(this.font, "Daily village income: +" + totalDailyIncome, x, y, TEXT_COLOR);
+        long totalPop = data.villages().stream().mapToLong(PolityViewPayload.VillageRow::population).sum();
+        gfx.drawString(this.font, "Population: " + totalPop + "  \u2022  villages: " + data.villages().size(), x, y, TEXT_COLOR);
         y += 12;
         gfx.drawString(this.font, String.format("Tax rate: %.0f%%  \u2022  Tribute rate: %.0f%%",
                 data.taxRate() * 100f, data.tributeRate() * 100f), x, y, LABEL_COLOR);
         y += 14;
 
-        // === Separator ===
         gfx.fill(x, y, rightX, y + 1, SEPARATOR_COLOR);
         y += 6;
 
         // === Villages ===
         gfx.drawString(this.font, "Villages (" + data.villages().size() + "):", x, y, GOLD_COLOR);
         y += 12;
-        int maxVillages = Math.min(data.villages().size(), 10);
-        for (int i = 0; i < maxVillages; i++) {
+        int maxShow = Math.min(data.villages().size(), 8);
+        for (int i = 0; i < maxShow; i++) {
             PolityViewPayload.VillageRow v = data.villages().get(i);
-            String line = String.format("  %s   stockpile %d   %+d/day", v.name(), v.stockpile(), v.dailyIncome());
-            gfx.drawString(this.font, line, x, y, TEXT_COLOR);
+            gfx.drawString(this.font, "  " + v.name() + "  (pop " + v.population() + ")", x, y, TEXT_COLOR);
             y += 11;
+            gfx.drawString(this.font, String.format("    food %d  \u2022  mats %d  \u2022  gold %d",
+                    v.food(), v.materials(), v.gold()), x, y, LABEL_COLOR);
+            y += 11;
+            gfx.drawString(this.font, String.format("    baseline: +%d food  +%d mats  +%d gold /day",
+                    v.baselineFood(), v.baselineMaterials(), v.baselineGold()), x, y, LABEL_COLOR);
+            y += 12;
         }
-        if (data.villages().size() > maxVillages) {
-            gfx.drawString(this.font, "  ... and " + (data.villages().size() - maxVillages) + " more", x, y, LABEL_COLOR);
+        if (data.villages().size() > maxShow) {
+            gfx.drawString(this.font, "  ... and " + (data.villages().size() - maxShow) + " more", x, y, LABEL_COLOR);
             y += 11;
         }
         y += 3;
 
-        // === Separator ===
         gfx.fill(x, y, rightX, y + 1, SEPARATOR_COLOR);
         y += 6;
 
@@ -104,7 +106,7 @@ public class PolityScreen extends Screen {
         if (!data.vassals().isEmpty()) {
             gfx.drawString(this.font, "Vassals (" + data.vassals().size() + "):", x, y, GOLD_COLOR);
             y += 12;
-            int maxVassals = Math.min(data.vassals().size(), 10);
+            int maxVassals = Math.min(data.vassals().size(), 6);
             for (int i = 0; i < maxVassals; i++) {
                 PolityViewPayload.VassalRow v = data.vassals().get(i);
                 gfx.drawString(this.font, "  " + v.displayName() + "  (" + v.leaderTitleName() + ")", x, y, TEXT_COLOR);

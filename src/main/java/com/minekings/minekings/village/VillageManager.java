@@ -55,7 +55,7 @@ public class VillageManager extends SavedData implements Iterable<Village> {
         ListTag villageList = nbt.getList("villages", Tag.TAG_COMPOUND);
         for (int i = 0; i < villageList.size(); i++) {
             Village village = new Village(villageList.getCompound(i), world);
-            if (village.getBuildings().isEmpty()) {
+            if (village.getBuildings().isEmpty() && !village.isFounded()) {
                 MineKings.LOGGER.warn("Empty village detected ({}), removing...", village.getName());
                 setDirty();
             } else {
@@ -201,8 +201,8 @@ public class VillageManager extends SavedData implements Iterable<Village> {
                 setDirty();
             }
 
-            //village is empty
-            if (village.getBuildings().isEmpty()) {
+            //village is empty (and not founded — founded villages persist without buildings)
+            if (village.getBuildings().isEmpty() && !village.isFounded()) {
                 villages.remove(village.getId());
                 optionalVillage = Optional.empty();
                 setDirty();
@@ -268,5 +268,25 @@ public class VillageManager extends SavedData implements Iterable<Village> {
 
     public void merge(Village into, Village from) {
         into.merge(from);
+    }
+
+    /**
+     * Player- or worldgen-driven founding. Creates a new village centered
+     * on {@code center} with a fixed seed bounding box (initial claim radius).
+     * Does not run any flood-fill detection; the village exists because
+     * something declared it, not because the world was scanned for it.
+     *
+     * @return the newly registered Village
+     */
+    public Village register(BlockPos center, String name) {
+        Village village = new Village(lastVillageId++, world);
+        if (name != null && !name.isBlank()) {
+            village.setName(name);
+        }
+        village.seedBounds(center, 48);
+        village.setFounded(true);
+        villages.put(village.getId(), village);
+        setDirty();
+        return village;
     }
 }

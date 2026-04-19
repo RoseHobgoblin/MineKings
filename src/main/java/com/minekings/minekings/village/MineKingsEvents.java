@@ -1,6 +1,7 @@
 package com.minekings.minekings.village;
 
 import com.minekings.minekings.MineKings;
+import com.minekings.minekings.economy.ConversionTable;
 import com.minekings.minekings.politics.CultureManager;
 import com.minekings.minekings.politics.PoliticsCommands;
 import com.minekings.minekings.politics.PoliticsManager;
@@ -50,6 +51,7 @@ public final class MineKingsEvents {
     public static void onAddReloadListeners(AddReloadListenerEvent event) {
         event.addListener(new BuildingTypes());
         event.addListener(new CultureManager());
+        event.addListener(new ConversionTable());
     }
 
     @SubscribeEvent

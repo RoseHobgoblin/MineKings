@@ -4,6 +4,5 @@
   "priority": 1,
   "blocks": {
     "minecraft:stonecutter": 1
-  },
-  "dailyIncome": 1.5
+  }
 }

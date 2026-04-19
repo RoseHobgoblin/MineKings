@@ -38,7 +38,6 @@ public final class BuildingType {
                 buf.writeVarInt(buildingType.iconV);
                 buf.writeBoolean(buildingType.grouped);
                 buf.writeVarInt(buildingType.mergeRange);
-                buf.writeDouble(buildingType.dailyIncome);
 
                 // Serialize blocks map
                 buf.writeVarInt(buildingType.blocks.size());
@@ -59,7 +58,6 @@ public final class BuildingType {
                 int iconV = buf.readVarInt();
                 boolean grouped = buf.readBoolean();
                 int mergeRange = buf.readVarInt();
-                double dailyIncome = buf.readDouble();
 
                 // Deserialize blocks map
                 int blocksSize = buf.readVarInt();
@@ -68,7 +66,7 @@ public final class BuildingType {
                     blocks.put(buf.readUtf(), buf.readVarInt());
                 }
 
-                return new BuildingType(name, margin, color, priority, visible, noBeds, icon, iconU, iconV, grouped, mergeRange, dailyIncome, blocks);
+                return new BuildingType(name, margin, color, priority, visible, noBeds, icon, iconU, iconV, grouped, mergeRange, blocks);
             }
     );
     private final String name;
@@ -83,13 +81,12 @@ public final class BuildingType {
     private final int iconV;
     private final boolean grouped;
     private final int mergeRange;
-    private final double dailyIncome;
     private transient Map<ResourceLocation, ResourceLocation> blockToGroup;
     private transient Map<ResourceLocation, Integer> groups;
 
     // Private constructor for deserialization
     private BuildingType(String name, int margin, String color, int priority, boolean visible, boolean noBeds,
-                         boolean icon, int iconU, int iconV, boolean grouped, int mergeRange, double dailyIncome, Map<String, Integer> blocks) {
+                         boolean icon, int iconU, int iconV, boolean grouped, int mergeRange, Map<String, Integer> blocks) {
         this.name = name;
         this.margin = margin;
         this.color = color;
@@ -101,7 +98,6 @@ public final class BuildingType {
         this.iconV = iconV;
         this.grouped = grouped;
         this.mergeRange = mergeRange;
-        this.dailyIncome = dailyIncome;
         this.blocks = blocks;
     }
 
@@ -119,7 +115,6 @@ public final class BuildingType {
         this.iconV = 0;
         this.grouped = false;
         this.mergeRange = 32;
-        this.dailyIncome = 0.0;
     }
 
     public BuildingType(String name, JsonObject value) {
@@ -136,7 +131,6 @@ public final class BuildingType {
 
         this.grouped = GsonHelper.getAsBoolean(value, "grouped", false);
         this.mergeRange = GsonHelper.getAsInt(value, "mergeRange", 0);
-        this.dailyIncome = value.has("dailyIncome") ? value.get("dailyIncome").getAsDouble() : 0.0;
 
         this.blocks = new HashMap<>();
         if (GsonHelper.isObjectNode(value, "blocks")) {
@@ -262,9 +256,5 @@ public final class BuildingType {
 
     public int getMinBlocks() {
         return blocks.values().stream().mapToInt(v -> v).sum();
-    }
-
-    public double dailyIncome() {
-        return dailyIncome;
     }
 }
