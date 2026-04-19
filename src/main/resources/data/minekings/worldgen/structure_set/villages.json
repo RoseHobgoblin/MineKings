@@ -1,11 +1,15 @@
 {
   "structures": [
-    { "structure": "minekings:village", "weight": 1 }
+    { "structure": "minekings:village_plains",  "weight": 8 },
+    { "structure": "minekings:village_desert",  "weight": 2 },
+    { "structure": "minekings:village_savanna", "weight": 2 },
+    { "structure": "minekings:village_snowy",   "weight": 1 },
+    { "structure": "minekings:village_taiga",   "weight": 2 }
   ],
   "placement": {
     "type": "minecraft:random_spread",
-    "salt": 202510001,
+    "salt": 10387312,
     "separation": 8,
-    "spacing": 24
+    "spacing": 34
   }
 }
