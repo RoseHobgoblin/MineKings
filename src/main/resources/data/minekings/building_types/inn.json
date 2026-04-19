@@ -2,12 +2,6 @@
   "color": "ffffff00",
   "visible": true,
   "priority": 4,
-  "blocks": {
-    "#minecraft:beds": 4,
-    "minecraft:jukebox": 1,
-    "minecraft:smoker": 1
-  },
   "iconU": 5,
-  "iconV": 1,
-  "noBeds": true
+  "iconV": 1
 }

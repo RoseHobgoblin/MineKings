@@ -1,74 +1,106 @@
 package com.minekings.minekings.village;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 /**
  * Derives abstract attribute flags (has_smithy, has_food_industry, etc.)
- * from a village's detected building types. The attribute set is what the
- * economy layer consumes — NOT the building list itself. This keeps the
- * economy decoupled from spatial detection: flood-fill gives us building
- * types, we flatten that into flags, economy reads flags.
+ * from workstation blocks present within the village's bounds.
  *
- * <p>v0.5 hardcodes the mapping; future versions may datapack it.
+ * <p>v0.6 replaced the flood-fill-building approach with direct block
+ * scanning: the block IS the industry. A smithing_table anywhere in the
+ * village radius gives has_smithy, regardless of whether it's inside a
+ * "house" structure or a mega-build. This makes the economy work for
+ * bunkers, creative builds, and modded workstations.
  */
 public final class VillageAttributes {
     private VillageAttributes() {}
 
-    /** Mapping from building-type id (matches building_types JSON filenames) to attribute flag(s). */
-    private static final Map<String, String[]> BUILDING_TO_ATTRS = Map.ofEntries(
-            // Food industry
-            Map.entry("bakery",         new String[]{"has_food_industry"}),
-            Map.entry("butcher",        new String[]{"has_food_industry"}),
-            Map.entry("fishermans_hut", new String[]{"has_food_industry", "coastal"}),
+    /** Workstation / marker block → attribute flag(s). */
+    private static final Map<Block, String[]> BLOCK_TO_ATTRS = new HashMap<>();
+    static {
+        // Food industry
+        BLOCK_TO_ATTRS.put(Blocks.SMOKER,            new String[]{"has_food_industry"});
+        BLOCK_TO_ATTRS.put(Blocks.COMPOSTER,         new String[]{"has_food_industry"});
+        BLOCK_TO_ATTRS.put(Blocks.BARREL,            new String[]{"has_food_industry"}); // fisherman workstation
 
-            // Smithing / weapons / armor
-            Map.entry("blacksmith",     new String[]{"has_smithy"}),
-            Map.entry("toolsmith",      new String[]{"has_smithy"}),
-            Map.entry("weaponsmith",    new String[]{"has_smithy", "has_arms"}),
-            Map.entry("armorer",        new String[]{"has_smithy", "has_arms"}),
-            Map.entry("armory",         new String[]{"has_arms"}),
+        // Smithing / weapons / armor
+        BLOCK_TO_ATTRS.put(Blocks.SMITHING_TABLE,    new String[]{"has_smithy", "has_arms"});
+        BLOCK_TO_ATTRS.put(Blocks.GRINDSTONE,        new String[]{"has_smithy"});
+        BLOCK_TO_ATTRS.put(Blocks.BLAST_FURNACE,     new String[]{"has_smithy"});
+        BLOCK_TO_ATTRS.put(Blocks.ANVIL,             new String[]{"has_smithy"});
+        BLOCK_TO_ATTRS.put(Blocks.CHIPPED_ANVIL,     new String[]{"has_smithy"});
+        BLOCK_TO_ATTRS.put(Blocks.DAMAGED_ANVIL,     new String[]{"has_smithy"});
+        BLOCK_TO_ATTRS.put(Blocks.FLETCHING_TABLE,   new String[]{"has_arms"});
 
-            // General craftsmen
-            Map.entry("mason",          new String[]{"has_craftsmen"}),
-            Map.entry("fletcher",       new String[]{"has_craftsmen"}),
-            Map.entry("leatherworker",  new String[]{"has_craftsmen"}),
-            Map.entry("weaving_mill",   new String[]{"has_craftsmen"}),
+        // Craftsmen
+        BLOCK_TO_ATTRS.put(Blocks.LOOM,              new String[]{"has_craftsmen"});
+        BLOCK_TO_ATTRS.put(Blocks.STONECUTTER,       new String[]{"has_craftsmen"});
+        BLOCK_TO_ATTRS.put(Blocks.CAULDRON,          new String[]{"has_craftsmen"}); // leatherworker
+        BLOCK_TO_ATTRS.put(Blocks.CARTOGRAPHY_TABLE, new String[]{"has_bookkeeper"});
 
-            // Civic / commercial
-            Map.entry("storage",        new String[]{"has_granary"}),
-            Map.entry("inn",            new String[]{"has_inn"}),
-            Map.entry("library",        new String[]{"has_library"}),
-            Map.entry("infirmary",      new String[]{"has_infirmary"}),
-            Map.entry("bookkeeper",     new String[]{"has_bookkeeper"}),
-            Map.entry("cartographer",   new String[]{"has_bookkeeper"}),
-            Map.entry("prison",         new String[]{"has_prison"}),
-            Map.entry("town_center",    new String[]{"is_central"}),
-            Map.entry("music_store",    new String[]{"has_music"}),
+        // Civic / commercial
+        BLOCK_TO_ATTRS.put(Blocks.BELL,              new String[]{"is_central"});
+        BLOCK_TO_ATTRS.put(Blocks.LECTERN,           new String[]{"has_library"});
+        BLOCK_TO_ATTRS.put(Blocks.BREWING_STAND,     new String[]{"has_infirmary"});
+        BLOCK_TO_ATTRS.put(Blocks.ENCHANTING_TABLE,  new String[]{"has_library"});
+        BLOCK_TO_ATTRS.put(Blocks.JUKEBOX,           new String[]{"has_music"});
 
-            // Housing
-            Map.entry("house",          new String[]{"has_housing"}),
-            Map.entry("big_house",      new String[]{"has_housing"}),
-            Map.entry("building",       new String[]{"has_housing"})
-    );
+        // Housing proxy — a bed implies someone lives there
+        BLOCK_TO_ATTRS.put(Blocks.RED_BED,           new String[]{"has_housing"});
+        BLOCK_TO_ATTRS.put(Blocks.WHITE_BED,         new String[]{"has_housing"});
+    }
 
-    /** Returns the attribute flags that this village's buildings yield. */
-    public static Set<String> derive(Village village) {
+    /** Returns the attribute flags implied by the blocks inside the village bounds. */
+    public static Set<String> derive(ServerLevel level, Village village) {
         Set<String> attrs = new HashSet<>();
-        for (Building b : village) {
-            String type = b.getType();
-            String[] flags = BUILDING_TO_ATTRS.get(type);
-            if (flags != null) {
-                for (String f : flags) attrs.add(f);
+        BoundingBox box = village.getBox();
+        if (box == null) return attrs;
+
+        // Scan the full box. Villages are typically ~96 blocks wide so this is
+        // a few tens of thousands of block reads — cheap enough to do once per
+        // day tick per village.
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        for (int x = box.minX(); x <= box.maxX(); x++) {
+            for (int z = box.minZ(); z <= box.maxZ(); z++) {
+                for (int y = box.minY(); y <= box.maxY(); y++) {
+                    m.set(x, y, z);
+                    Block b = level.getBlockState(m).getBlock();
+                    String[] flags = BLOCK_TO_ATTRS.get(b);
+                    if (flags != null) {
+                        for (String f : flags) attrs.add(f);
+                    }
+                }
             }
         }
+
+        // Population proxy: count beds via vanilla PoiManager (faster than
+        // bed-block scanning, already used by Village.updateMaxPopulation).
+        PoiManager poi = level.getPoiManager();
+        long bedCount = poi.findAll(
+                holder -> holder.is(net.minecraft.world.entity.ai.village.poi.PoiTypes.HOME),
+                pos -> box.isInside(pos),
+                new BlockPos(box.getCenter()),
+                Math.max(box.getXSpan(), box.getZSpan()),
+                PoiManager.Occupancy.ANY
+        ).count();
+        if (bedCount > 0) attrs.add("has_housing");
+
         return attrs;
     }
 
     /** Derives and applies attributes to the village. Does not mark dirty. */
-    public static void refresh(Village village) {
-        Set<String> next = derive(village);
+    public static void refresh(ServerLevel level, Village village) {
+        Set<String> next = derive(level, village);
         village.setAttributes(next);
     }
 }

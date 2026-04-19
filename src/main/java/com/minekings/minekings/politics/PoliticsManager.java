@@ -278,6 +278,85 @@ public class PoliticsManager extends SavedData {
     }
 
     /**
+     * Player-founding path: creates a polity for {@code village} with a
+     * player-backed Character as its leader. The Character's
+     * {@code playerUuid} is set so that reconciliation / death-handling
+     * code can recognize it's not villager-embodied. Does NOT trigger any
+     * leader-villager name stamping (the player is their own embodiment).
+     */
+    public Polity foundPlayerPolity(Village village, net.minecraft.server.level.ServerPlayer player, long currentDay) {
+        BlockPos center = new BlockPos(village.getCenter());
+        ResourceLocation biomeId = world.getBiome(center).unwrapKey()
+                .map(ResourceKey::location)
+                .orElse(null);
+        Culture culture = CultureManager.getInstance().assignCultureForBiome(biomeId);
+
+        int polityId = nextPolityId++;
+        Polity polity = new Polity(
+                polityId,
+                village.getName(),
+                culture.id(),
+                Polity.LEADER_VACANT,
+                currentDay
+        );
+        polity.addVillage(village.getId());
+
+        int characterId = nextCharacterId++;
+        Character founder = new Character(
+                characterId,
+                player.getGameProfile().getName(),
+                culture.id(),
+                currentDay - 7300L,
+                polityId
+        );
+        founder.setPlayerUuid(player.getUUID());
+        characters.put(characterId, founder);
+        polity.setLeaderCharacterId(characterId);
+
+        polities.put(polityId, polity);
+        setDirty();
+        return polity;
+    }
+
+    /**
+     * Removes the current leader (marking them dead) and installs the
+     * given player as the new player-backed leader of the polity.
+     * Used by the Founding Stone's right-click deposition flow.
+     */
+    public void deposeAndClaim(Polity polity, net.minecraft.server.level.ServerPlayer player, long currentDay) {
+        int oldCharId = polity.getLeaderCharacterId();
+        Character oldLeader = (oldCharId == Polity.LEADER_VACANT) ? null : characters.get(oldCharId);
+        if (oldLeader != null) {
+            oldLeader.setDeathDay(currentDay);
+            unbind(oldCharId);
+        }
+        Culture culture = getCultureOf(polity);
+        int newCharId = nextCharacterId++;
+        Character newChar = new Character(
+                newCharId,
+                player.getGameProfile().getName(),
+                culture.id(),
+                currentDay - 7300L,
+                polity.getId()
+        );
+        newChar.setPlayerUuid(player.getUUID());
+        characters.put(newCharId, newChar);
+        polity.setLeaderCharacterId(newCharId);
+        setDirty();
+    }
+
+    /** Returns the polity led by the given player, if any. */
+    public Optional<Polity> getPolityRuledByPlayer(UUID playerUuid) {
+        for (Polity p : polities.values()) {
+            Character leader = characters.get(p.getLeaderCharacterId());
+            if (leader != null && playerUuid.equals(leader.getPlayerUuid())) {
+                return Optional.of(p);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Generates a new {@link Character} from a culture's name pool and
      * registers them in the characters map. Used at founding, and again
      * during day-tick succession when a polity has a vacant leader slot.
@@ -406,9 +485,10 @@ public class PoliticsManager extends SavedData {
         // 3. Economy pass: attributes → baseline → storehouse drain → consumption → pop dynamics → tax → tribute
         VillageManager vmEcon = VillageManager.get(level);
 
-        // 3a. Refresh each village's attribute set from its detected buildings.
+        // 3a. Refresh each village's attribute set by scanning workstation
+        // blocks inside its bounds (v0.6: replaced flood-fill-derived attrs).
         for (Village v : vmEcon) {
-            VillageAttributes.refresh(v);
+            VillageAttributes.refresh(level, v);
         }
 
         // 3b. Baseline production (from attributes) into per-resource stockpiles.
@@ -578,6 +658,8 @@ public class PoliticsManager extends SavedData {
      * first (idempotency). Also sets the villager's custom name from the
      * character + culture tier.
      */
+    public static final String TAG_CHARACTER_ID = "minekings_character_id";
+
     public void bind(Polity polity, Character character, Villager villager) {
         int characterId = character.getId();
         if (embodiments.containsKey(characterId)) {
@@ -585,13 +667,16 @@ public class PoliticsManager extends SavedData {
         }
         embodiments.put(characterId, villager.getUUID());
         embodiedBy.put(villager.getUUID(), characterId);
+        villager.getPersistentData().putInt(TAG_CHARACTER_ID, characterId);
         refreshName(polity, character, villager);
         setDirty();
     }
 
     /**
      * Clears the binding for a character. If the bound villager is still
-     * loaded, also clears its custom name.
+     * loaded, also clears its custom name and persistent stamp. If not,
+     * the stamp will be cleaned up on next chunk load via
+     * {@link #onTaggedVillagerLoaded}.
      */
     public void unbind(int characterId) {
         UUID uuid = embodiments.remove(characterId);
@@ -599,10 +684,15 @@ public class PoliticsManager extends SavedData {
         embodiedBy.remove(uuid);
         Entity e = world.getEntity(uuid);
         if (e instanceof Villager v && !v.isRemoved()) {
-            v.setCustomName(null);
-            v.setCustomNameVisible(false);
+            clearEmbodimentMarks(v);
         }
         setDirty();
+    }
+
+    private static void clearEmbodimentMarks(Villager v) {
+        v.setCustomName(null);
+        v.setCustomNameVisible(false);
+        v.getPersistentData().remove(TAG_CHARACTER_ID);
     }
 
     /** Applies the culture-appropriate leader title + character name to a villager. */
@@ -624,6 +714,7 @@ public class PoliticsManager extends SavedData {
             if (characterId == Polity.LEADER_VACANT) continue; // succession runs on dayTick
             Character leader = characters.get(characterId);
             if (leader == null || !leader.isAlive()) continue;
+            if (leader.isPlayerBacked()) continue; // player IS the embodiment — no villager binding
 
             UUID boundUuid = embodiments.get(characterId);
             if (boundUuid != null) {
@@ -631,9 +722,12 @@ public class PoliticsManager extends SavedData {
                 if (e instanceof Villager v && !v.isRemoved()) {
                     continue; // still valid, nothing to do
                 }
-                // Stale entry — clear it silently (don't call unbind because
-                // the entity is gone and we don't want to clear anyone's
-                // custom name as a side effect).
+                // Entity unresolvable. It could be in an unloaded chunk OR
+                // actually gone. Only rebind if the polity's villages have
+                // chunks loaded — otherwise the villager is just away and
+                // rebinding now would double up the leader name when the
+                // old villager reloads.
+                if (!hasLoadedVillageChunks(level, p)) continue;
                 embodiments.remove(characterId);
                 embodiedBy.remove(boundUuid);
                 setDirty();
@@ -644,6 +738,61 @@ public class PoliticsManager extends SavedData {
                 bind(p, leader, candidate);
             }
         }
+    }
+
+    private boolean hasLoadedVillageChunks(ServerLevel level, Polity p) {
+        VillageManager vm = VillageManager.get(level);
+        for (int villageId : p.getHeldVillageIds()) {
+            Optional<Village> vOpt = vm.getOrEmpty(villageId);
+            if (vOpt.isEmpty()) continue;
+            BlockPos center = new BlockPos(vOpt.get().getBox().getCenter());
+            if (level.isLoaded(center)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Called when a villager tagged with {@link #TAG_CHARACTER_ID} enters a
+     * level (chunk load, dimension change, NBT restore). Reconciles the
+     * villager against the current embodiment state and cleans up stale
+     * names from previous leaders / old bindings.
+     */
+    public void onTaggedVillagerLoaded(ServerLevel level, Villager v, int characterId) {
+        Character c = characters.get(characterId);
+        if (c == null || !c.isAlive()) {
+            clearEmbodimentMarks(v);
+            return;
+        }
+
+        Polity leadingPolity = null;
+        for (Polity p : polities.values()) {
+            if (p.getLeaderCharacterId() == characterId) {
+                leadingPolity = p;
+                break;
+            }
+        }
+        if (leadingPolity == null) {
+            // Character exists but no longer leads anything — wipe stale name.
+            clearEmbodimentMarks(v);
+            return;
+        }
+
+        UUID officialUuid = embodiments.get(characterId);
+        if (officialUuid == null) {
+            // No current embodiment registered — reclaim this villager as the embodiment.
+            embodiments.put(characterId, v.getUUID());
+            embodiedBy.put(v.getUUID(), characterId);
+            refreshName(leadingPolity, c, v);
+            setDirty();
+            return;
+        }
+        if (officialUuid.equals(v.getUUID())) {
+            // This IS the official villager — reapply the name in case vanilla cleared it.
+            refreshName(leadingPolity, c, v);
+            return;
+        }
+        // Another villager is the current embodiment — this one's tag is stale.
+        clearEmbodimentMarks(v);
     }
 
     /**

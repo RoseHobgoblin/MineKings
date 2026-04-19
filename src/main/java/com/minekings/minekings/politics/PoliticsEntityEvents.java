@@ -8,6 +8,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.npc.Villager;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -26,6 +27,23 @@ import java.util.stream.Collectors;
 @EventBusSubscriber(modid = MineKings.MODID)
 public final class PoliticsEntityEvents {
     private PoliticsEntityEvents() {}
+
+    /**
+     * Fired when any entity enters a level — including villagers loaded
+     * from NBT after a chunk load. If the villager has a persistent
+     * {@code minekings_character_id} stamp, we reconcile against the
+     * current embodiment state, which clears stale "Baron X" names from
+     * villagers who were once leader-bound but aren't anymore.
+     */
+    @SubscribeEvent
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (!(event.getEntity() instanceof Villager villager)) return;
+        if (!(villager.level() instanceof ServerLevel serverLevel)) return;
+        var data = villager.getPersistentData();
+        if (!data.contains(PoliticsManager.TAG_CHARACTER_ID)) return;
+        int characterId = data.getInt(PoliticsManager.TAG_CHARACTER_ID);
+        PoliticsManager.get(serverLevel).onTaggedVillagerLoaded(serverLevel, villager, characterId);
+    }
 
     @SubscribeEvent
     public static void onLivingDeath(LivingDeathEvent event) {
@@ -67,7 +85,7 @@ public final class PoliticsEntityEvents {
         event.setCanceled(true);
     }
 
-    private static PolityViewPayload buildPayload(PoliticsManager mgr, Polity polity, ServerLevel level) {
+    public static PolityViewPayload buildPayload(PoliticsManager mgr, Polity polity, ServerLevel level) {
         Character leader = mgr.getCharacter(polity.getLeaderCharacterId()).orElse(null);
         String leaderTitleName = leader != null
                 ? (mgr.getLeaderTitle(polity) + " " + leader.getName())

@@ -2,6 +2,8 @@ package com.minekings.minekings.politics;
 
 import net.minecraft.nbt.CompoundTag;
 
+import java.util.UUID;
+
 /**
  * A political actor, stored as pure data. Characters are not tied to any
  * villager entity — the entity (when loaded) would be a <em>projection</em>
@@ -27,6 +29,7 @@ public final class Character {
     private long birthDay;
     private long deathDay;
     private int currentPolityId;
+    private UUID playerUuid; // null for NPC characters; set for player-backed ones
 
     public Character(int id, String name, String cultureName, long birthDay, int currentPolityId) {
         this.id = id;
@@ -44,6 +47,7 @@ public final class Character {
         this.birthDay = nbt.getLong("birthDay");
         this.deathDay = nbt.contains("deathDay") ? nbt.getLong("deathDay") : DEATH_DAY_ALIVE;
         this.currentPolityId = nbt.contains("currentPolityId") ? nbt.getInt("currentPolityId") : POLITY_NONE;
+        this.playerUuid = nbt.hasUUID("playerUuid") ? nbt.getUUID("playerUuid") : null;
     }
 
     public CompoundTag save() {
@@ -54,8 +58,13 @@ public final class Character {
         nbt.putLong("birthDay", birthDay);
         nbt.putLong("deathDay", deathDay);
         nbt.putInt("currentPolityId", currentPolityId);
+        if (playerUuid != null) nbt.putUUID("playerUuid", playerUuid);
         return nbt;
     }
+
+    public UUID getPlayerUuid() { return playerUuid; }
+    public void setPlayerUuid(UUID uuid) { this.playerUuid = uuid; }
+    public boolean isPlayerBacked() { return playerUuid != null; }
 
     public int getId() { return id; }
     public String getName() { return name; }

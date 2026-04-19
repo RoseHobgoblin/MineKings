@@ -1,0 +1,7 @@
+{
+  "type": "minekings:village",
+  "biomes": "#minekings:village_spawnable",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

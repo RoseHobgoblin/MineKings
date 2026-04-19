@@ -27,6 +27,9 @@ public class MineKings {
         MineKingsBlocks.BLOCKS.register(modEventBus);
         MineKingsItems.ITEMS.register(modEventBus);
         MineKingsCreativeTabs.TABS.register(modEventBus);
+        com.minekings.minekings.registry.MineKingsBlockEntities.BLOCK_ENTITIES.register(modEventBus);
+        com.minekings.minekings.registry.MineKingsStructures.STRUCTURE_TYPES.register(modEventBus);
+        com.minekings.minekings.registry.MineKingsStructures.STRUCTURE_PIECES.register(modEventBus);
 
         NeoForge.EVENT_BUS.register(this);
     }

@@ -20,5 +20,11 @@ public final class MineKingsPackets {
                 PolityViewPayload.STREAM_CODEC,
                 PolityViewClientHandler::handle
         );
+
+        registrar.playToServer(
+                RequestHubDataPayload.TYPE,
+                RequestHubDataPayload.STREAM_CODEC,
+                RequestHubDataHandler::handle
+        );
     }
 }

@@ -1,8 +1,5 @@
 {
   "color": "ffaaaaaa",
   "visible": false,
-  "priority": 1,
-  "blocks": {
-    "minecraft:loom": 1
-  }
+  "priority": 1
 }

@@ -1,0 +1,11 @@
+{
+  "structures": [
+    { "structure": "minekings:village", "weight": 1 }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 202510001,
+    "separation": 8,
+    "spacing": 24
+  }
+}

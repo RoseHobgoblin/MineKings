@@ -213,7 +213,7 @@ public class Village implements Iterable<Building> {
     }
 
     public boolean isPositionValidBed(BlockPos pos) {
-        return getBuildingAt(pos).filter(b -> b.getBuildingType().noBeds()).isEmpty();
+        return true; // v0.6: no flood-fill, every bed inside bounds counts
     }
 
     public boolean hasBuilding(String building) {
