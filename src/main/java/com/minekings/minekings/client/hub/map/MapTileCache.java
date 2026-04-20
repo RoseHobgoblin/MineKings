@@ -1,12 +1,21 @@
 package com.minekings.minekings.client.hub.map;
 
+import com.minekings.minekings.MineKings;
 import com.minekings.minekings.politics.MapRegionPayload;
 import com.minekings.minekings.politics.RequestMapRegionPayload;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -53,14 +62,20 @@ public final class MapTileCache {
 
     private boolean inFlight = false;
     private long lastRequestMs = 0L;
+    /** Monotonic version bumped on every tile mutation. Viewport-level
+     *  memos in the renderer watch this to know when to rebuild. */
+    private volatile int version = 0;
 
     private MapTileCache() {}
+
+    public int version() { return version; }
 
     /** Drops everything. Call when the hub closes or world changes. */
     public void clear() {
         tiles.clear();
         villagesByPos.clear();
         inFlight = false;
+        version++;
     }
 
     public @Nullable ChunkTile get(int chunkX, int chunkZ) {
@@ -76,6 +91,7 @@ public final class MapTileCache {
         if (terrain == MapRegionPayload.TERRAIN_UNLOADED) return;
         tiles.put(ChunkPos.asLong(chunkX, chunkZ),
                 new ChunkTile(terrain, biome, System.currentTimeMillis()));
+        version++;
     }
 
     /**
@@ -107,6 +123,67 @@ public final class MapTileCache {
             villagesByPos.put(key, m);
         }
         inFlight = false;
+        version++;
+    }
+
+    // ---- Disk persistence (client-side, per-world) ----
+
+    /**
+     * Save the tile map + markers to a binary NBT file. Cheap: one compound
+     * with parallel int/long/string arrays.
+     */
+    public void saveToFile(Path path) {
+        try {
+            Files.createDirectories(path.getParent());
+            CompoundTag root = new CompoundTag();
+            root.putInt("version", 1);
+            int n = tiles.size();
+            long[] keys = new long[n];
+            byte[] terrains = new byte[n];
+            ListTag biomeList = new ListTag();
+            int i = 0;
+            for (Map.Entry<Long, ChunkTile> e : tiles.entrySet()) {
+                keys[i] = e.getKey();
+                terrains[i] = e.getValue().terrain();
+                ResourceLocation b = e.getValue().biome();
+                biomeList.add(net.minecraft.nbt.StringTag.valueOf(b == null ? "" : b.toString()));
+                i++;
+            }
+            root.putLongArray("keys", keys);
+            root.putByteArray("terrains", terrains);
+            root.put("biomes", biomeList);
+            NbtIo.writeCompressed(root, path);
+            MineKings.LOGGER.info("[MK] Saved {} map tiles to {}", n, path.getFileName());
+        } catch (IOException ex) {
+            MineKings.LOGGER.warn("[MK] Failed to save map cache: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * Replace the current cache with tiles loaded from disk. Silently no-ops
+     * if the file doesn't exist (first visit to this world).
+     */
+    public void loadFromFile(Path path) {
+        if (!Files.exists(path)) return;
+        try {
+            CompoundTag root = NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap());
+            tiles.clear();
+            villagesByPos.clear();
+            long[] keys = root.getLongArray("keys");
+            byte[] terrains = root.getByteArray("terrains");
+            ListTag biomeList = root.getList("biomes", Tag.TAG_STRING);
+            long now = System.currentTimeMillis();
+            int n = Math.min(keys.length, Math.min(terrains.length, biomeList.size()));
+            for (int i = 0; i < n; i++) {
+                String s = biomeList.getString(i);
+                ResourceLocation biome = s.isEmpty() ? null : ResourceLocation.tryParse(s);
+                tiles.put(keys[i], new ChunkTile(terrains[i], biome, now));
+            }
+            version++;
+            MineKings.LOGGER.info("[MK] Loaded {} map tiles from {}", n, path.getFileName());
+        } catch (IOException ex) {
+            MineKings.LOGGER.warn("[MK] Failed to load map cache: {}", ex.getMessage());
+        }
     }
 
     /**

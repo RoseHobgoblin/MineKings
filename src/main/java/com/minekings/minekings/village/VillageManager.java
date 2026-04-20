@@ -12,6 +12,7 @@ import com.minekings.minekings.village.util.MKNbtHelper;
 import com.minekings.minekings.village.util.MKWorldUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -84,6 +85,20 @@ public class VillageManager extends SavedData implements Iterable<Village> {
     public Optional<Village> findNearestVillage(Entity entity) {
         BlockPos p = entity.blockPosition();
         return findVillages(v -> v.isWithinBorder(entity)).min((a, b) -> (int) (a.getCenter().distSqr(p) - b.getCenter().distSqr(p)));
+    }
+
+    /**
+     * Find a worldgen-founded village by its structure-start chunk. This is
+     * the stable dedup key on chunk reload — a jigsaw structure's bounding
+     * box grows as pieces are placed during generation, so center-based
+     * matching is unreliable across save/load, but its start chunk never
+     * moves.
+     */
+    public Optional<Village> findByStartChunk(ChunkPos startChunk) {
+        if (startChunk == null) return Optional.empty();
+        return villages.values().stream()
+                .filter(v -> startChunk.equals(v.getStartChunkPos()))
+                .findFirst();
     }
 
     public Optional<Village> findNearestVillage(BlockPos p, int margin) {

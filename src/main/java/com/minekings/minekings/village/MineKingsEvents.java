@@ -18,6 +18,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.structure.Structure;
@@ -30,6 +31,7 @@ import net.neoforged.neoforge.event.level.ChunkEvent;
 import net.neoforged.neoforge.event.tick.LevelTickEvent;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Central event wiring for the MineKings village layer.
@@ -102,18 +104,56 @@ public final class MineKingsEvents {
             if (id == null || !MineKings.MODID.equals(id.getNamespace())) continue;
             if (!id.getPath().startsWith("village")) continue;
 
+            ChunkPos startChunk = start.getChunkPos();
             Vec3i c = start.getBoundingBox().getCenter();
             BlockPos center = new BlockPos(c.getX(), c.getY(), c.getZ());
 
             if (vm == null) vm = VillageManager.get(level);
-            if (vm.findNearestVillage(center, 0).isPresent()) continue;
+            // Dedup on start-chunk position, not center. The jigsaw structure's
+            // bounding box (and thus its center) grows as pieces are placed,
+            // so a reload can produce a center outside the originally-seeded
+            // village box — which made center-based dedup silently miss and
+            // re-register the village with a fresh polity/thane.
+            if (vm.findByStartChunk(startChunk).isPresent()) continue;
+
+            // Migration: villages saved before the startChunkPos field was
+            // introduced have no anchor. Adopt any nearby founded village
+            // whose box still contains the current center (within a generous
+            // margin covering jigsaw expansion) instead of duplicating it.
+            Optional<Village> legacy = vm.findNearestVillage(center, 128)
+                    .filter(v -> v.getStartChunkPos() == null && v.isFounded());
+            if (legacy.isPresent()) {
+                Village keep = legacy.get();
+                keep.setStartChunkPos(startChunk);
+                MineKings.LOGGER.info("[MK] Adopted legacy village {} with start chunk {} (structure {})",
+                        keep.getId(), startChunk, id);
+                // Orphan cleanup: any OTHER founded village still lacking a
+                // start chunk that overlaps the adopted one is a duplicate
+                // from the pre-fix bug. Remove it and disband its polity if
+                // it was the polity's only holding.
+                if (pm == null) pm = PoliticsManager.get(level);
+                var orphans = vm.findVillages(v ->
+                        v.getId() != keep.getId()
+                                && v.isFounded()
+                                && v.getStartChunkPos() == null
+                                && v.isWithinBorder(new BlockPos(keep.getCenter()), 0))
+                        .toList();
+                for (Village orphan : orphans) {
+                    pm.onVillageRemoved(orphan.getId());
+                    vm.removeVillage(orphan.getId());
+                    MineKings.LOGGER.info("[MK] Removed duplicate village {} (\"{}\") overlapping adopted village {}",
+                            orphan.getId(), orphan.getName(), keep.getId());
+                }
+                continue;
+            }
 
             Village village = vm.register(center, null);
+            village.setStartChunkPos(startChunk);
             if (pm == null) pm = PoliticsManager.get(level);
             long currentDay = level.getDayTime() / 24000L;
             pm.foundPolityForVillage(village, currentDay);
-            MineKings.LOGGER.info("[MK] Registered worldgen village {} at {} from structure {}",
-                    village.getId(), center.toShortString(), id);
+            MineKings.LOGGER.info("[MK] Registered worldgen village {} at {} (start chunk {}) from structure {}",
+                    village.getId(), center.toShortString(), startChunk, id);
         }
     }
 

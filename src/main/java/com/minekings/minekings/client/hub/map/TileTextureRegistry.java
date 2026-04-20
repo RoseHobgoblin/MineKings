@@ -9,6 +9,7 @@ import net.minecraft.world.level.biome.Biome;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Resolves a biome resource location → {@link TileTextureSet} for the
@@ -86,6 +87,24 @@ public final class TileTextureRegistry {
         DIRECT.put("minecraft:deep_dark",               "minekings:cave_walls");
     }
 
+    /**
+     * Memo for {@link #resolveByLocation} — the renderer calls it per subtile
+     * per frame (hundreds of times) with a small set of distinct biomes, so
+     * we cache the result. Invalidated whenever the texture set datapack
+     * reloads via {@link #invalidateResolveCache()}.
+     */
+    private static final Map<ResourceLocation, TileTextureSet> RESOLVE_CACHE = new ConcurrentHashMap<>();
+    /** Bumped on each cache invalidation so viewport-level memos can notice. */
+    private static volatile int CACHE_VERSION = 0;
+
+    /** Called by {@link TileTextureSetManager} after reload. */
+    public static void invalidateResolveCache() {
+        RESOLVE_CACHE.clear();
+        CACHE_VERSION++;
+    }
+
+    public static int cacheVersion() { return CACHE_VERSION; }
+
     private TileTextureRegistry() {}
 
     /**
@@ -103,14 +122,16 @@ public final class TileTextureRegistry {
             return TileTextureSetManager.getInstance().get(DEFAULT_SET)
                     .orElseGet(() -> TileTextureSet.of(DEFAULT_SET, java.util.List.of()));
         }
-        String direct = DIRECT.get(biomeId.toString());
-        TileTextureSetManager mgr = TileTextureSetManager.getInstance();
-        if (direct != null) {
-            Optional<TileTextureSet> d = mgr.get(direct);
-            if (d.isPresent()) return d.get();
-        }
-        return mgr.get(DEFAULT_SET)
-                .orElseGet(() -> TileTextureSet.of(DEFAULT_SET, java.util.List.of()));
+        return RESOLVE_CACHE.computeIfAbsent(biomeId, id -> {
+            String direct = DIRECT.get(id.toString());
+            TileTextureSetManager mgr = TileTextureSetManager.getInstance();
+            if (direct != null) {
+                Optional<TileTextureSet> d = mgr.get(direct);
+                if (d.isPresent()) return d.get();
+            }
+            return mgr.get(DEFAULT_SET)
+                    .orElseGet(() -> TileTextureSet.of(DEFAULT_SET, java.util.List.of()));
+        });
     }
 
     public static TileTextureSet resolve(Holder<Biome> holder) {

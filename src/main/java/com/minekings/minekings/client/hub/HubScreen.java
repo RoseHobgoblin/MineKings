@@ -79,6 +79,17 @@ public class HubScreen extends Screen {
     private record MarkerHit(int cx, int cy, int radius, MapRegionPayload.VillageMarker marker) {}
     private final List<MarkerHit> markerHits = new ArrayList<>();
 
+    /** Pre-resolved subtile draw command. Cached across frames when the
+     *  viewport + tile data haven't changed, so the expensive iterator
+     *  rebuild + per-subtile texture resolve only runs on pan/zoom/data-change. */
+    private record TerrainQuad(ResourceLocation tex, int x, int y, int u, int v) {}
+    private final List<TerrainQuad> terrainQuadCache = new ArrayList<>();
+    private int terrainCacheKeyMinX, terrainCacheKeyMinZ, terrainCacheKeyMaxX, terrainCacheKeyMaxZ;
+    private int terrainCachePxPerChunk = -1;
+    private int terrainCacheOriginX, terrainCacheOriginY;
+    private int terrainCacheTileVersion = -1;
+    private int terrainCacheResolveVersion = -1;
+
     private @Nullable Button recenterButton;
 
     public HubScreen() {
@@ -282,14 +293,42 @@ public class HubScreen extends Screen {
     private void renderAutotiledTerrain(GuiGraphics gfx, int originX, int originY,
                                         int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
                                         int pxPerChunk) {
+        int tileVersion = MapTileCache.INSTANCE.version();
+        int resolveVersion = TileTextureRegistry.cacheVersion();
+        boolean cacheValid = terrainCachePxPerChunk == pxPerChunk
+                && terrainCacheKeyMinX == minChunkX && terrainCacheKeyMinZ == minChunkZ
+                && terrainCacheKeyMaxX == maxChunkX && terrainCacheKeyMaxZ == maxChunkZ
+                && terrainCacheOriginX == originX && terrainCacheOriginY == originY
+                && terrainCacheTileVersion == tileVersion
+                && terrainCacheResolveVersion == resolveVersion;
+
+        if (!cacheValid) {
+            rebuildTerrainQuadCache(originX, originY, minChunkX, minChunkZ, maxChunkX, maxChunkZ, pxPerChunk);
+            terrainCachePxPerChunk = pxPerChunk;
+            terrainCacheKeyMinX = minChunkX; terrainCacheKeyMinZ = minChunkZ;
+            terrainCacheKeyMaxX = maxChunkX; terrainCacheKeyMaxZ = maxChunkZ;
+            terrainCacheOriginX = originX; terrainCacheOriginY = originY;
+            terrainCacheTileVersion = tileVersion;
+            terrainCacheResolveVersion = resolveVersion;
+        }
+
+        SetTileRenderer renderer = new SetTileRenderer(gfx, pxPerChunk);
+        for (TerrainQuad q : terrainQuadCache) {
+            renderer.add(q.tex(), q.x(), q.y(), q.u(), q.v());
+        }
+        renderer.flush();
+    }
+
+    private void rebuildTerrainQuadCache(int originX, int originY,
+                                         int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
+                                         int pxPerChunk) {
+        terrainQuadCache.clear();
         TileRenderIterator it = new TileRenderIterator(
                 (cx, cz) -> MapTileCache.INSTANCE.biomeAt(cx, cz),
                 TileTextureRegistry::resolveByLocation);
         it.setScope(minChunkX, minChunkZ, maxChunkX, maxChunkZ);
 
-        SetTileRenderer renderer = new SetTileRenderer(gfx, pxPerChunk);
         int halfChunkPx = pxPerChunk / 2;
-
         int mapLeft = 0;
         int mapTop = 0;
         int mapRight = this.width;
@@ -301,16 +340,13 @@ public class HubScreen extends Screen {
                 TileTextureSet set = TileTextureRegistry.resolveByLocation(s.tile);
                 if (set == null || set.variants().isEmpty()) continue;
                 ResourceLocation tex = set.pickForSeed(s.variationNumber);
-                // Subtile grid: 0 = first subtile of first chunk in scope.
-                // AA's iterator emits x/y starting at -1 for the pre-scope margin.
                 int sx = originX + minChunkX * pxPerChunk + s.x * halfChunkPx;
                 int sy = originY + minChunkZ * pxPerChunk + s.y * halfChunkPx;
                 if (sx + halfChunkPx <= mapLeft || sy + halfChunkPx <= mapTop
                     || sx >= mapRight || sy >= mapBottom) continue;
-                renderer.add(tex, sx, sy, s.getTextureU(), s.getTextureV());
+                terrainQuadCache.add(new TerrainQuad(tex, sx, sy, s.getTextureU(), s.getTextureV()));
             }
         }
-        renderer.flush();
     }
 
     private void renderScaleBar(GuiGraphics gfx, int mapBottom, int pxPerChunk) {

@@ -63,6 +63,7 @@ public class TileTextureSetManager extends SimpleJsonResourceReloadListener {
             }
         }
         MineKings.LOGGER.info("Loaded {} map texture sets.", sets.size());
+        TileTextureRegistry.invalidateResolveCache();
     }
 
     private static TileTextureSet parse(ResourceLocation id, JsonObject root) {

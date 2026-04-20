@@ -159,6 +159,42 @@ public class PoliticsManager extends SavedData {
         return c.getAge(currentDay);
     }
 
+    /**
+     * Called when a village is removed from the world (e.g. orphan cleanup
+     * on load). Strips the village from any holding polity and, if that
+     * leaves the polity landless, disbands it — freeing its leader character,
+     * any embodiment binding, and any allegiances it was party to.
+     */
+    public void onVillageRemoved(int villageId) {
+        Optional<Polity> holder = findPolityHoldingVillage(villageId);
+        if (holder.isEmpty()) return;
+        Polity p = holder.get();
+        p.removeVillage(villageId);
+        if (p.getHeldVillageIds().isEmpty()) {
+            disbandPolity(p.getId());
+        }
+        setDirty();
+    }
+
+    /**
+     * Removes a polity outright: drops its leader character + embodiment,
+     * cuts every allegiance it participates in (as vassal or lord), and
+     * removes it from the polity map. Used by orphan cleanup; not wired
+     * to a player-facing action.
+     */
+    public void disbandPolity(int polityId) {
+        Polity p = polities.remove(polityId);
+        if (p == null) return;
+        int leaderId = p.getLeaderCharacterId();
+        if (leaderId != Polity.LEADER_VACANT) {
+            characters.remove(leaderId);
+            UUID bound = embodiments.remove(leaderId);
+            if (bound != null) embodiedBy.remove(bound);
+        }
+        allegiances.removeIf(a -> a.vassalPolityId() == polityId || a.lordPolityId() == polityId);
+        setDirty();
+    }
+
     /** Finds the polity currently holding a given village, if any. */
     public Optional<Polity> findPolityHoldingVillage(int villageId) {
         for (Polity p : polities.values()) {

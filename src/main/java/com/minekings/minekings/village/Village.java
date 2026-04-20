@@ -11,6 +11,7 @@ import com.minekings.minekings.village.util.MKNbtHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
@@ -56,6 +57,11 @@ public class Village implements Iterable<Building> {
     private long lastBedSync;
     private boolean autoScan = false;
     private boolean founded = false;      // true if created by player/worldgen (not flood-fill)
+    // Start-chunk anchor for worldgen-founded villages. Stable across reloads
+    // even when the jigsaw structure's bounding box grows as pieces are placed,
+    // so it's the correct dedup key on ChunkEvent.Load. Null for player-founded
+    // villages (Founding Stone) which have no structure start.
+    private ChunkPos startChunkPos = null;
     // === Economic state (v0.5) ===
     private int population = 1;             // current inhabitants
     private long food = 0L;                  // food stockpile
@@ -98,6 +104,9 @@ public class Village implements Iterable<Building> {
             this.autoScan = false;
         }
         this.founded = v.getBoolean("founded");
+        if (v.contains("startChunkX") && v.contains("startChunkZ")) {
+            this.startChunkPos = new ChunkPos(v.getInt("startChunkX"), v.getInt("startChunkZ"));
+        }
 
         ListTag b = v.getList("buildings", Tag.TAG_COMPOUND);
         for (int i = 0; i < b.size(); i++) {
@@ -269,11 +278,18 @@ public class Village implements Iterable<Building> {
         v.put("buildings", MKNbtHelper.fromList(buildings.values(), Building::save));
         v.putBoolean("autoScan", autoScan);
         v.putBoolean("founded", founded);
+        if (startChunkPos != null) {
+            v.putInt("startChunkX", startChunkPos.x);
+            v.putInt("startChunkZ", startChunkPos.z);
+        }
         return v;
     }
 
     public boolean isFounded() { return founded; }
     public void setFounded(boolean founded) { this.founded = founded; markDirty(); }
+
+    public ChunkPos getStartChunkPos() { return startChunkPos; }
+    public void setStartChunkPos(ChunkPos pos) { this.startChunkPos = pos; markDirty(); }
 
     // === Resource stockpiles (v0.5 multi-resource economy) ===
     public long getFood() { return food; }
