@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:snow_pines_hills": 1,
+      "minekings:snow_pines_hills2": 1,
+      "minekings:snow_pines_hills3": 1
+    },
+    "stitch": {
+      "minekings:snow": "both",
+      "minekings:snow_hills": "both",
+      "minekings:ice_spikes": "both",
+      "minekings:snow_pines_hills": "both"
+    }
+  }
+}

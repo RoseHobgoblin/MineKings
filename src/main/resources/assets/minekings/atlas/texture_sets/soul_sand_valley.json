@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:sand": 1,
+      "minekings:sand2": 1,
+      "minekings:sand_bushes": 1
+    }
+  }
+}

@@ -3,6 +3,7 @@ package com.minekings.minekings.politics;
 import com.minekings.minekings.MineKings;
 import com.minekings.minekings.economy.EconomyRules;
 import com.minekings.minekings.economy.StorehouseDrain;
+import com.minekings.minekings.politics.embodiment.Embodiment;
 import com.minekings.minekings.village.Building;
 import com.minekings.minekings.village.Village;
 import com.minekings.minekings.village.VillageAttributes;
@@ -690,17 +691,13 @@ public class PoliticsManager extends SavedData {
     }
 
     private static void clearEmbodimentMarks(Villager v) {
-        v.setCustomName(null);
-        v.setCustomNameVisible(false);
+        Embodiment.ACTIVE.clearLeaderIdentity(v);
         v.getPersistentData().remove(TAG_CHARACTER_ID);
     }
 
     /** Applies the culture-appropriate leader title + character name to a villager. */
     public void refreshName(Polity p, Character c, Villager v) {
-        String title = getLeaderTitle(p);
-        Component name = Component.literal(title + " " + c.getName());
-        v.setCustomName(name);
-        v.setCustomNameVisible(true);
+        Embodiment.ACTIVE.applyLeaderIdentity(v, getLeaderTitle(p), c);
     }
 
     /**
@@ -801,7 +798,11 @@ public class PoliticsManager extends SavedData {
      * babies are eligible (the "child monarch" scenario is in scope).
      */
     private Villager findCandidateVillager(ServerLevel level, Polity polity) {
+        Character leader = characters.get(polity.getLeaderCharacterId());
         VillageManager vm = VillageManager.get(level);
+        Villager best = null;
+        float bestScore = Float.NEGATIVE_INFINITY;
+        int tieCount = 0;
         for (int villageId : polity.getHeldVillageIds()) {
             Optional<Village> vOpt = vm.getOrEmpty(villageId);
             if (vOpt.isEmpty()) continue;
@@ -815,11 +816,20 @@ public class PoliticsManager extends SavedData {
                     aabb,
                     v -> !v.isRemoved() && !embodiedBy.containsKey(v.getUUID())
             );
-            if (!candidates.isEmpty()) {
-                return candidates.get(level.random.nextInt(candidates.size()));
+            for (Villager v : candidates) {
+                float score = Embodiment.ACTIVE.candidateScore(v, polity, leader);
+                if (score > bestScore) {
+                    best = v;
+                    bestScore = score;
+                    tieCount = 1;
+                } else if (score == bestScore) {
+                    // Reservoir-sample over ties so random wins stay fair.
+                    tieCount++;
+                    if (level.random.nextInt(tieCount) == 0) best = v;
+                }
             }
         }
-        return null;
+        return best;
     }
 
     /**

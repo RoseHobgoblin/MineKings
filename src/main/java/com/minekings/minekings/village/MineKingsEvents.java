@@ -67,6 +67,13 @@ public final class MineKingsEvents {
             if (level.getGameTime() % 100L == 0L) {
                 mgr.reconcileEmbodiments(level);
             }
+            // MCA village bridge: mirror MineKings villages into MCA's
+            // VillageManager so MCA villagers use them as home. No-op when
+            // MCA is absent. Runs every 10 seconds — cheap map update.
+            if (level.getGameTime() % 200L == 0L
+                    && com.minekings.minekings.politics.compat.mca.MCAVillageBridge.ACTIVE != null) {
+                com.minekings.minekings.politics.compat.mca.MCAVillageBridge.ACTIVE.sync(level);
+            }
         }
     }
 

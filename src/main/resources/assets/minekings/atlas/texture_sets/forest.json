@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:forest": 1,
+      "minekings:forest2": 1,
+      "minekings:forest3": 1
+    }
+  }
+}

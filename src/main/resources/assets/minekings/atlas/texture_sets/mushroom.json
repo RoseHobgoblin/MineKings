@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:mushroom": 1,
+      "minekings:mushroom2": 1
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:end_island": 1,
+      "minekings:end_island_plants": 1,
+      "minekings:end_island_plants2": 1
+    },
+    "stitch": {
+      "minekings:end_island": "both"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:mesa": 1,
+      "minekings:mesa2": 1,
+      "minekings:mesa3": 1,
+      "minekings:mesa4": 1,
+      "minekings:sand_bushes": 1
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:plateau_trees": 1,
+      "minekings:plateau_mesa": 1,
+      "minekings:plateau_mesa2": 1
+    },
+    "stitch": {
+      "minekings:plateau_mesa_low": "both"
+    }
+  }
+}

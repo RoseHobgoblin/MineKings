@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:swamp": 3,
+      "minekings:swamp3": 1,
+      "minekings:swamp6": 1
+    },
+    "stitch": {
+      "minekings:swamp_hills": "both",
+      "minekings:swamp": "both",
+      "minekings:water": "both"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:bryce": 1,
+      "minekings:bryce2": 1,
+      "minekings:bryce3": 1,
+      "minekings:bryce4": 1
+    }
+  }
+}

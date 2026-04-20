@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:jungle_cliffs": 1,
+      "minekings:jungle_cliffs2": 1,
+      "minekings:bushes_cliffs": 1
+    }
+  }
+}

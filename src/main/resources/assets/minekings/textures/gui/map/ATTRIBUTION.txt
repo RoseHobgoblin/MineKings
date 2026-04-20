@@ -1,0 +1,62 @@
+AntiqueAtlas attribution
+=========================
+
+The following assets are copied or derived from AntiqueAtlas by the
+AntiqueAtlasTeam, licensed under the GNU General Public License v3.
+
+    Source: https://github.com/AntiqueAtlasTeam/AntiqueAtlas
+
+MineKings is distributed under GPL v3, which is compatible with this lift.
+
+Copied verbatim
+---------------
+
+- assets/minekings/textures/gui/map/tiles/*.png
+      All ~189 PNGs in tiles/ are copied from
+      assets/antiqueatlas/textures/gui/tiles/ in the AA source. File names
+      preserved. These are the biome autotile textures.
+
+- assets/minekings/textures/gui/map/markers/village.png
+      Copied from assets/antiqueatlas/textures/gui/markers/village.png
+
+- assets/minekings/textures/gui/map/markers/frame.png
+      Copied from assets/antiqueatlas/textures/gui/marker_frame_on.png
+
+- assets/minekings/textures/gui/map/player.png
+      Copied from assets/antiqueatlas/textures/gui/player.png
+
+- data/minekings/atlas/texture_sets/*.json
+      All ~92 JSONs are copied from
+      assets/antiqueatlas/atlas/texture_sets/ in the AA source. The
+      texture references inside have been rewritten from the
+      "antiqueatlas:" namespace to "minekings:" so MineKings resolves them
+      to its own copies above.
+
+Derived
+-------
+
+- assets/minekings/textures/gui/map/land.png (v0.7 artifact, to be removed)
+- assets/minekings/textures/gui/map/ocean.png
+- assets/minekings/textures/gui/map/coast.png
+      Small 16x16 center subtiles extracted from the AA autotile textures
+      grass.png, water.png, sand.png respectively (bottom-center 16x16
+      region). Used by the v0.7 renderer; will be removed once the v0.8
+      autotile pipeline ships.
+
+Ported code
+-----------
+
+- src/.../client/hub/map/TileTextureSet.java
+- src/.../client/hub/map/TileTextureSetManager.java
+- src/.../client/hub/map/TileTextureRegistry.java
+      Port of AntiqueAtlas's TextureSet / TextureSetMap / TileTextureMap
+      rewritten for Minecraft 1.21.1 (which removed Biome.Category).
+      Biome → texture-set mapping uses a direct lookup table for vanilla
+      biomes plus a BiomeTags fallback for modded biomes.
+
+- src/.../client/hub/map/SubTile.java
+- src/.../client/hub/map/SubTileShape.java
+- src/.../client/hub/map/TileRenderIterator.java
+- src/.../client/hub/map/SetTileRenderer.java
+      Ports of AntiqueAtlas's autotile renderer classes of the same name.
+      Each file carries a GPL v3 header attributing AA.

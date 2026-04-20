@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:nether_tower": 1
+    },
+    "stitch": {
+      "minekings:nether_bridge_gate": "both",
+      "minekings:nether_bridge": "both",
+      "minekings:nether_hall": "both",
+      "minekings:nether_fort_stairs": "both",
+      "minekings:nether_throne": "both",
+      "minekings:nether_bridge_z": "vertical",
+      "minekings:nether_bridge_end_z": "vertical",
+      "minekings:nether_bridge_x": "horizontal",
+      "minekings:nether_bridge_end_x": "horizontal"
+    }
+  }
+}

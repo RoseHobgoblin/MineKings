@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:village_path_z": 1
+    },
+    "stitch": {
+      "minekings:village_path_x": "both"
+    }
+  }
+}

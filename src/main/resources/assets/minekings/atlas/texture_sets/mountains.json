@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:mountains": 2,
+      "minekings:mountains2": 2,
+      "minekings:mountains3": 1,
+      "minekings:mountains4": 1,
+      "minekings:mountains5": 2
+    },
+    "stitch": {
+      "minekings:mountains_naked": "both",
+      "minekings:mountains_snow_caps": "both",
+      "minekings:mountains_all": "both"
+    }
+  }
+}

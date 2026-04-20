@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:plateau_grass": 1,
+      "minekings:plateau_grass2": 1,
+      "minekings:plateau_grass3": 1,
+      "minekings:plateau_savanna2": 1,
+      "minekings:plateau_savanna3": 1,
+      "minekings:cliffs_clouds": 1,
+      "minekings:savanna_cliffs_clouds": 1,
+      "minekings:savanna_cliffs_clouds2": 1,
+      "minekings:savanna_cliffs_clouds3": 1
+    },
+    "stitch":{
+      "minekings:plateau_mesa": "both",
+      "minekings:plateau_mesa_trees": "both",
+      "minekings:plateau_savanna": "both"
+    }
+  }
+}

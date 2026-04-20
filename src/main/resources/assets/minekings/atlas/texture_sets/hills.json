@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:hills": 3,
+      "minekings:hills_bushes": 1
+    }
+  }
+}

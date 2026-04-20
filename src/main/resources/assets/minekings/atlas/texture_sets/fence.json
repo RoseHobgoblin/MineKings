@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:fence": 1
+    },
+    "stitch": {
+      "minekings:house": "both"
+    }
+  }
+}

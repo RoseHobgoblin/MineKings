@@ -1,5 +1,6 @@
 {
   "displayName": "Nordic",
+  "color": "#7FA3D8",
   "biomes": [
     "minecraft:snowy_plains",
     "minecraft:taiga",

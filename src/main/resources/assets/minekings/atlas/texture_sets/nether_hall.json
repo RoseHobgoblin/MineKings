@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:nether_hall": 1
+    },
+    "stitch": {
+      "minekings:nether_wall": "both",
+      "minekings:nether_fort_stairs": "both"
+    }
+  }
+}

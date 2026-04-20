@@ -34,6 +34,8 @@ public final class Culture {
     private final List<String> firstNames;
     private final List<String> lastNames;
     private final String polityNameFormat;
+    /** Packed 0xRRGGBB. Used to tint this culture's villages on the map. */
+    private final int color;
 
     /** Sentinel used when no culture at all is loaded (misconfigured datapack). */
     public static Culture empty() {
@@ -45,7 +47,8 @@ public final class Culture {
                 List.of("Leader"),
                 List.of("Nameless"),
                 List.of("One"),
-                "{tier} of {place}"
+                "{tier} of {place}",
+                0x888888
         );
     }
 
@@ -56,7 +59,8 @@ public final class Culture {
                     List<String> leaderTitles,
                     List<String> firstNames,
                     List<String> lastNames,
-                    String polityNameFormat) {
+                    String polityNameFormat,
+                    int color) {
         this.id = id;
         this.displayName = displayName;
         this.biomes = Collections.unmodifiableList(biomes);
@@ -65,6 +69,7 @@ public final class Culture {
         this.firstNames = Collections.unmodifiableList(firstNames);
         this.lastNames = Collections.unmodifiableList(lastNames);
         this.polityNameFormat = polityNameFormat;
+        this.color = color;
     }
 
     public Culture(String id, JsonObject json) {
@@ -76,6 +81,23 @@ public final class Culture {
         this.firstNames = parseStringList(json, "firstNames");
         this.lastNames = parseStringList(json, "lastNames");
         this.polityNameFormat = GsonHelper.getAsString(json, "polityNameFormat", "{tier} of {place}");
+        this.color = parseColor(json);
+    }
+
+    private static int parseColor(JsonObject json) {
+        if (!json.has("color")) return 0x888888;
+        JsonElement e = json.get("color");
+        if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isString()) {
+            String s = e.getAsString().trim();
+            if (s.startsWith("#")) s = s.substring(1);
+            if (s.startsWith("0x") || s.startsWith("0X")) s = s.substring(2);
+            try {
+                return Integer.parseInt(s, 16) & 0xFFFFFF;
+            } catch (NumberFormatException ex) {
+                return 0x888888;
+            }
+        }
+        return e.getAsInt() & 0xFFFFFF;
     }
 
     private static List<ResourceLocation> parseResourceLocations(JsonObject json, String key) {
@@ -106,6 +128,7 @@ public final class Culture {
     public List<String> firstNames() { return firstNames; }
     public List<String> lastNames() { return lastNames; }
     public String polityNameFormat() { return polityNameFormat; }
+    public int color() { return color; }
 
     /** Returns true if {@code biomeId} matches this culture's biome list. Empty list = never matches (wildcard is handled elsewhere). */
     public boolean matchesBiome(ResourceLocation biomeId) {

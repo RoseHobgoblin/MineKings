@@ -9,6 +9,7 @@ import net.minecraft.world.entity.npc.Villager;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingConversionEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -50,6 +51,23 @@ public final class PoliticsEntityEvents {
         if (!(event.getEntity() instanceof Villager villager)) return;
         if (!(villager.level() instanceof ServerLevel serverLevel)) return;
         PoliticsManager.get(serverLevel).handleLeaderDeath(serverLevel, villager.getUUID());
+    }
+
+    /**
+     * Zombie (or MCA zombie-villager) conversion treats the leader as dead:
+     * the Character is gone either way, and the new entity is a different
+     * UUID that our embodiment map wouldn't recognize anyway. Without this
+     * handler, a bound leader getting zombified leaves the polity with a
+     * ghost leader that succession never replaces.
+     */
+    @SubscribeEvent
+    public static void onLivingConversion(LivingConversionEvent.Post event) {
+        if (!(event.getEntity().level() instanceof ServerLevel serverLevel)) return;
+        PoliticsManager mgr = PoliticsManager.get(serverLevel);
+        java.util.UUID originalUuid = event.getEntity().getUUID();
+        if (mgr.getEmbodiedBy(originalUuid) != null) {
+            mgr.handleLeaderDeath(serverLevel, originalUuid);
+        }
     }
 
     /**

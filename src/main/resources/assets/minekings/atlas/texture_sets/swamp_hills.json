@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:swamp_hills": 1,
+      "minekings:swamp_hills2": 1,
+      "minekings:swamp_hills3": 1,
+      "minekings:swamp_hills4": 1,
+      "minekings:swamp_hills5": 1
+    }
+  }
+}

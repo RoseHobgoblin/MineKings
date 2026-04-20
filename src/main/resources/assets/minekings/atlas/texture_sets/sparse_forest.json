@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:forest_sparse": 1,
+      "minekings:forest_sparse2": 1,
+      "minekings:forest_sparse3": 1,
+      "minekings:grass": 1,
+      "minekings:grass2": 1,
+      "minekings:grass3": 1,
+      "minekings:grass4": 1
+    }
+  }
+}

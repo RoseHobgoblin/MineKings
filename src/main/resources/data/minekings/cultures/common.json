@@ -1,5 +1,6 @@
 {
   "displayName": "Common",
+  "color": "#C4A160",
   "biomes": [],
   "tiers": ["Barony", "County", "Duchy", "Kingdom", "Empire"],
   "leaderTitles": ["Baron", "Count", "Duke", "King", "Emperor"],

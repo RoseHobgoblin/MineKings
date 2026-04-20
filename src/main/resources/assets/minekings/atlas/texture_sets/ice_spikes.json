@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:ice_spikes": 1,
+      "minekings:ice_spikes2": 1
+    }
+  }
+}

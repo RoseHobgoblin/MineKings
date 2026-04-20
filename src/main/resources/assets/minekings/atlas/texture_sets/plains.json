@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:grass": 1,
+      "minekings:grass2": 1,
+      "minekings:grass3": 1,
+      "minekings:grass4": 1
+    },
+    "stitch": {
+      "minekings:sunflowers": "both"
+    }
+  }
+}

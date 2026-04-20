@@ -1,6 +1,7 @@
 package com.minekings.minekings;
 
 import com.minekings.minekings.politics.MineKingsPackets;
+import com.minekings.minekings.politics.embodiment.Embodiment;
 import com.minekings.minekings.registry.MineKingsBlocks;
 import com.minekings.minekings.registry.MineKingsCreativeTabs;
 import com.minekings.minekings.registry.MineKingsItems;
@@ -37,6 +38,7 @@ public class MineKings {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         LOGGER.info("MineKings common setup — preparing to overhaul villages into nations");
+        event.enqueueWork(Embodiment::init);
     }
 
     @SubscribeEvent

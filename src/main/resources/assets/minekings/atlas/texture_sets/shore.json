@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "data": {
+    "shore": {
+      "water": "minekings:water"
+    },
+    "textures": {
+      "minekings:shore": 1,
+      "minekings:shore2": 1,
+      "minekings:shore3": 1
+    }
+  }
+}

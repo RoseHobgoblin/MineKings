@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:snow": 5,
+      "minekings:snow1": 3,
+      "minekings:snow2": 3,
+      "minekings:snow3": 1,
+      "minekings:snow4": 1,
+      "minekings:snow5": 1,
+      "minekings:snow6": 1
+    },
+    "stitch": {
+      "minekings:snow_pines": "both",
+      "minekings:snow_hills": "both",
+      "minekings:ice_spikes": "both",
+      "minekings:snow_pines_hills": "both",
+      "minekings:ravine": "both",
+      "minekings:lava": "both",
+      "minekings:water": "both"
+    }
+  }
+}

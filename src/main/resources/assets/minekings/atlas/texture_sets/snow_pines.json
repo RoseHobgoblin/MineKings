@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:snow_pines": 1,
+      "minekings:snow_pines2": 1,
+      "minekings:snow_pines3": 1
+    }
+  }
+}

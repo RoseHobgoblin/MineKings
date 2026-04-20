@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:sand": 2,
+      "minekings:sand2": 2,
+      "minekings:sand3": 2,
+      "minekings:sand_bushes": 2,
+      "minekings:cacti": 1
+    },
+    "stitch": {
+      "minekings:mesa": "both",
+      "minekings:bryce": "both"
+    }
+  }
+}

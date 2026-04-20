@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:jungle_edge": 1,
+      "minekings:jungle_edge2": 1,
+      "minekings:jungle_edge3": 1,
+      "minekings:grass2": 1,
+      "minekings:grass3": 1,
+      "minekings:grass4": 1
+    }
+  }
+}
