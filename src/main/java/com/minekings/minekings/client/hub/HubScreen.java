@@ -79,14 +79,16 @@ public class HubScreen extends Screen {
     private record MarkerHit(int cx, int cy, int radius, MapRegionPayload.VillageMarker marker) {}
     private final List<MarkerHit> markerHits = new ArrayList<>();
 
-    /** Pre-resolved subtile draw command. Cached across frames when the
-     *  viewport + tile data haven't changed, so the expensive iterator
-     *  rebuild + per-subtile texture resolve only runs on pan/zoom/data-change. */
-    private record TerrainQuad(ResourceLocation tex, int x, int y, int u, int v) {}
+    /** Pre-resolved subtile draw command. Coordinates are world-space-ish
+     *  (origin-independent): {@code baseX = minChunkX*pxPerChunk + s.x*halfChunkPx}.
+     *  The current frame's {@code originX}/{@code originY} are added at draw
+     *  time, so sub-chunk player movement (which shifts the origin every
+     *  frame under followPlayer) does NOT invalidate the cache — only chunk
+     *  boundary crossings, zoom changes, or new tile data do. */
+    private record TerrainQuad(ResourceLocation tex, int baseX, int baseY, int u, int v) {}
     private final List<TerrainQuad> terrainQuadCache = new ArrayList<>();
     private int terrainCacheKeyMinX, terrainCacheKeyMinZ, terrainCacheKeyMaxX, terrainCacheKeyMaxZ;
     private int terrainCachePxPerChunk = -1;
-    private int terrainCacheOriginX, terrainCacheOriginY;
     private int terrainCacheTileVersion = -1;
     private int terrainCacheResolveVersion = -1;
 
@@ -298,29 +300,38 @@ public class HubScreen extends Screen {
         boolean cacheValid = terrainCachePxPerChunk == pxPerChunk
                 && terrainCacheKeyMinX == minChunkX && terrainCacheKeyMinZ == minChunkZ
                 && terrainCacheKeyMaxX == maxChunkX && terrainCacheKeyMaxZ == maxChunkZ
-                && terrainCacheOriginX == originX && terrainCacheOriginY == originY
                 && terrainCacheTileVersion == tileVersion
                 && terrainCacheResolveVersion == resolveVersion;
 
         if (!cacheValid) {
-            rebuildTerrainQuadCache(originX, originY, minChunkX, minChunkZ, maxChunkX, maxChunkZ, pxPerChunk);
+            rebuildTerrainQuadCache(minChunkX, minChunkZ, maxChunkX, maxChunkZ, pxPerChunk);
             terrainCachePxPerChunk = pxPerChunk;
             terrainCacheKeyMinX = minChunkX; terrainCacheKeyMinZ = minChunkZ;
             terrainCacheKeyMaxX = maxChunkX; terrainCacheKeyMaxZ = maxChunkZ;
-            terrainCacheOriginX = originX; terrainCacheOriginY = originY;
             terrainCacheTileVersion = tileVersion;
             terrainCacheResolveVersion = resolveVersion;
         }
 
+        int halfChunkPx = pxPerChunk / 2;
+        int mapLeft = 0;
+        int mapTop = 0;
+        int mapRight = this.width;
+        int mapBottom = this.height - TAB_ROW_HEIGHT - 12;
+
         SetTileRenderer renderer = new SetTileRenderer(gfx, pxPerChunk);
         for (TerrainQuad q : terrainQuadCache) {
-            renderer.add(q.tex(), q.x(), q.y(), q.u(), q.v());
+            int sx = originX + q.baseX();
+            int sy = originY + q.baseY();
+            // Draw-time screen-bounds cull (origin changes each frame under
+            // followPlayer, so this must run per-frame, not at cache time).
+            if (sx + halfChunkPx <= mapLeft || sy + halfChunkPx <= mapTop
+                || sx >= mapRight || sy >= mapBottom) continue;
+            renderer.add(q.tex(), sx, sy, q.u(), q.v());
         }
         renderer.flush();
     }
 
-    private void rebuildTerrainQuadCache(int originX, int originY,
-                                         int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
+    private void rebuildTerrainQuadCache(int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ,
                                          int pxPerChunk) {
         terrainQuadCache.clear();
         TileRenderIterator it = new TileRenderIterator(
@@ -329,22 +340,16 @@ public class HubScreen extends Screen {
         it.setScope(minChunkX, minChunkZ, maxChunkX, maxChunkZ);
 
         int halfChunkPx = pxPerChunk / 2;
-        int mapLeft = 0;
-        int mapTop = 0;
-        int mapRight = this.width;
-        int mapBottom = this.height - TAB_ROW_HEIGHT - 12;
-
         for (SubTileQuartet q : it) {
             for (SubTile s : q) {
                 if (s.tile == null) continue;
                 TileTextureSet set = TileTextureRegistry.resolveByLocation(s.tile);
                 if (set == null || set.variants().isEmpty()) continue;
                 ResourceLocation tex = set.pickForSeed(s.variationNumber);
-                int sx = originX + minChunkX * pxPerChunk + s.x * halfChunkPx;
-                int sy = originY + minChunkZ * pxPerChunk + s.y * halfChunkPx;
-                if (sx + halfChunkPx <= mapLeft || sy + halfChunkPx <= mapTop
-                    || sx >= mapRight || sy >= mapBottom) continue;
-                terrainQuadCache.add(new TerrainQuad(tex, sx, sy, s.getTextureU(), s.getTextureV()));
+                // Store origin-independent coords; draw path adds originX/Y.
+                int baseX = minChunkX * pxPerChunk + s.x * halfChunkPx;
+                int baseY = minChunkZ * pxPerChunk + s.y * halfChunkPx;
+                terrainQuadCache.add(new TerrainQuad(tex, baseX, baseY, s.getTextureU(), s.getTextureV()));
             }
         }
     }
