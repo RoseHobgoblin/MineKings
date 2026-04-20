@@ -118,6 +118,15 @@ public class Village implements Iterable<Building> {
 
         if (!buildings.isEmpty()) {
             calculateDimensions();
+        } else if (v.contains("box")) {
+            // Worldgen/Founding-Stone villages have no Building records —
+            // their bounds come from seedBounds(), so we must persist them
+            // explicitly. Without this, post-reload box = (0,0,0,0,0,0),
+            // which breaks marker queries and border checks.
+            int[] bx = v.getIntArray("box");
+            if (bx.length == 6) {
+                this.box = new BoundingBox(bx[0], bx[1], bx[2], bx[3], bx[4], bx[5]);
+            }
         }
     }
 
@@ -282,6 +291,10 @@ public class Village implements Iterable<Building> {
             v.putInt("startChunkX", startChunkPos.x);
             v.putInt("startChunkZ", startChunkPos.z);
         }
+        v.putIntArray("box", new int[] {
+                box.minX(), box.minY(), box.minZ(),
+                box.maxX(), box.maxY(), box.maxZ()
+        });
         return v;
     }
 
