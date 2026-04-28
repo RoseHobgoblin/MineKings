@@ -14,7 +14,7 @@ public final class MineKingsPackets {
     private MineKingsPackets() {}
 
     public static void register(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar(MineKings.MODID).versioned("1");
+        PayloadRegistrar registrar = event.registrar(MineKings.MODID).versioned("2");
 
         registrar.playToClient(
                 PolityViewPayload.TYPE,

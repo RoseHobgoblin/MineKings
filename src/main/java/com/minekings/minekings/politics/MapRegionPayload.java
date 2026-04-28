@@ -36,8 +36,24 @@ public record MapRegionPayload(
         byte[] terrain,
         short[] biomeIds,
         List<String> biomePalette,
-        List<VillageMarker> markers
+        List<VillageMarker> markers,
+        List<ChunkTileOverride> tileOverrides,
+        List<VillageChunks> villageChunks
 ) implements CustomPacketPayload {
+
+    /**
+     * Per-chunk tile replacement used by the hub map to render village
+     * buildings (house/farm/path/...) in place of the underlying biome tile.
+     * Tile id is a full ResourceLocation string like {@code minekings:house}.
+     */
+    public record ChunkTileOverride(int chunkX, int chunkZ, String tileId) {}
+
+    /**
+     * The set of chunks a single village occupies, plus its culture color,
+     * used by the client to draw a 1-px outline around the village cluster
+     * and to hit-test hover anywhere inside that region.
+     */
+    public record VillageChunks(int villageId, int colorRGB, long[] chunkPosLongs) {}
 
     public static final byte TERRAIN_UNLOADED = 0;
     public static final byte TERRAIN_LAND = 1;
@@ -94,6 +110,19 @@ public record MapRegionPayload(
             buf.writeUtf(m.polityName, 128);
             buf.writeUtf(m.leaderLine, 96);
         }
+        buf.writeVarInt(p.tileOverrides.size());
+        for (ChunkTileOverride o : p.tileOverrides) {
+            buf.writeVarInt(o.chunkX);
+            buf.writeVarInt(o.chunkZ);
+            buf.writeUtf(o.tileId, 96);
+        }
+        buf.writeVarInt(p.villageChunks.size());
+        for (VillageChunks vc : p.villageChunks) {
+            buf.writeVarInt(vc.villageId);
+            buf.writeVarInt(vc.colorRGB);
+            buf.writeVarInt(vc.chunkPosLongs.length);
+            for (long cp : vc.chunkPosLongs) buf.writeLong(cp);
+        }
     }
 
     private static MapRegionPayload decode(FriendlyByteBuf buf) {
@@ -123,7 +152,22 @@ public record MapRegionPayload(
                     buf.readUtf(96)
             ));
         }
-        return new MapRegionPayload(cx, cz, w, h, terrain, biomeIds, palette, ms);
+        int on = buf.readVarInt();
+        List<ChunkTileOverride> overrides = new ArrayList<>(on);
+        for (int i = 0; i < on; i++) {
+            overrides.add(new ChunkTileOverride(buf.readVarInt(), buf.readVarInt(), buf.readUtf(96)));
+        }
+        int vcn = buf.readVarInt();
+        List<VillageChunks> vcs = new ArrayList<>(vcn);
+        for (int i = 0; i < vcn; i++) {
+            int vid = buf.readVarInt();
+            int col = buf.readVarInt();
+            int cpn = buf.readVarInt();
+            long[] cps = new long[cpn];
+            for (int j = 0; j < cpn; j++) cps[j] = buf.readLong();
+            vcs.add(new VillageChunks(vid, col, cps));
+        }
+        return new MapRegionPayload(cx, cz, w, h, terrain, biomeIds, palette, ms, overrides, vcs);
     }
 
     @Override

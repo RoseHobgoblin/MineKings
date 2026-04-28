@@ -1,10 +1,12 @@
 package com.minekings.minekings.politics;
 
+import com.minekings.minekings.village.Building;
 import com.minekings.minekings.village.Village;
 import com.minekings.minekings.village.VillageManager;
 import net.minecraft.core.Vec3i;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -46,6 +48,8 @@ public final class RequestMapRegionHandler {
         PoliticsManager pol = PoliticsManager.get(level);
         VillageManager vm = VillageManager.get(level);
         List<MapRegionPayload.VillageMarker> markers = new ArrayList<>();
+        List<MapRegionPayload.ChunkTileOverride> overrides = new ArrayList<>();
+        List<MapRegionPayload.VillageChunks> villageChunks = new ArrayList<>();
 
         int chunkMaxXIncl = maxX;
         int chunkMaxZIncl = maxZ;
@@ -83,10 +87,23 @@ public final class RequestMapRegionHandler {
             markers.add(new MapRegionPayload.VillageMarker(
                     c.getX(), c.getZ(), color, tier, v.getPopulation(), markerTypeId,
                     v.getName(), polityName, leaderLine));
+
+            // Per-building tile overrides + chunk union for this village.
+            long[] chunks = new long[v.getBuildings().size()];
+            int i = 0;
+            for (Building b : v.getBuildings().values()) {
+                overrides.add(new MapRegionPayload.ChunkTileOverride(
+                        b.getChunkX(), b.getChunkZ(), "minekings:" + b.getType()));
+                chunks[i++] = ChunkPos.asLong(b.getChunkX(), b.getChunkZ());
+            }
+            if (chunks.length > 0) {
+                villageChunks.add(new MapRegionPayload.VillageChunks(v.getId(), color, chunks));
+            }
         }
 
         // width/height left as 0: client reads only the markers field.
         PacketDistributor.sendToPlayer(player,
-                new MapRegionPayload(minX, minZ, 0, 0, terrain, biomeIds, palette, markers));
+                new MapRegionPayload(minX, minZ, 0, 0, terrain, biomeIds, palette, markers,
+                        overrides, villageChunks));
     }
 }

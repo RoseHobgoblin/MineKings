@@ -35,6 +35,19 @@ public class Building {
         posX  = pos0X;      posY  = pos0Y;      posZ  = pos0Z;
     }
 
+    /** Axis-aligned building spanning {@code pos0 → pos1} inclusive. */
+    public Building(BlockPos pos0, BlockPos pos1) {
+        this.pos0X = Math.min(pos0.getX(), pos1.getX());
+        this.pos0Y = Math.min(pos0.getY(), pos1.getY());
+        this.pos0Z = Math.min(pos0.getZ(), pos1.getZ());
+        this.pos1X = Math.max(pos0.getX(), pos1.getX());
+        this.pos1Y = Math.max(pos0.getY(), pos1.getY());
+        this.pos1Z = Math.max(pos0.getZ(), pos1.getZ());
+        this.posX  = (pos0X + pos1X) / 2;
+        this.posY  = (pos0Y + pos1Y) / 2;
+        this.posZ  = (pos0Z + pos1Z) / 2;
+    }
+
     public Building(CompoundTag v) {
         id = v.getInt("id");
         pos0X = v.getInt("pos0X"); pos0Y = v.getInt("pos0Y"); pos0Z = v.getInt("pos0Z");
@@ -82,6 +95,9 @@ public class Building {
 
     public BlockPos getPos0() { return new BlockPos(pos0X, pos0Y, pos0Z); }
     public BlockPos getPos1() { return new BlockPos(pos1X, pos1Y, pos1Z); }
+
+    public int getChunkX() { return pos0X >> 4; }
+    public int getChunkZ() { return pos0Z >> 4; }
 
     public BlockPos getCenter() {
         return new BlockPos((pos0X + pos1X) / 2, (pos0Y + pos1Y) / 2, (pos0Z + pos1Z) / 2);

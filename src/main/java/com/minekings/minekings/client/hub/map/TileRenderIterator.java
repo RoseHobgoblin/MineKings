@@ -168,6 +168,7 @@ public class TileRenderIterator implements Iterator<SubTileQuartet>, Iterable<Su
     private boolean sameSet(ResourceLocation a, ResourceLocation b) {
         if (a == null || b == null) return false;
         if (a.equals(b)) return true;
+        if (TileTextureRegistry.stitchAliased(a, b)) return true;
         TileTextureSet sa = setLookup.apply(a);
         TileTextureSet sb = setLookup.apply(b);
         return sa != null && sb != null && sa.id().equals(sb.id());

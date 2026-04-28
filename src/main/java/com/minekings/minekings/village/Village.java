@@ -333,6 +333,27 @@ public class Village implements Iterable<Building> {
     }
 
     /**
+     * Atomic bulk replace used by the per-village block-scanner. Clears the
+     * existing building set and rewrites from {@code scanned}. Recomputes
+     * dimensions only if the scan produced at least one building, so an
+     * empty scan preserves the seeded bounds rather than collapsing the
+     * village box to the origin.
+     */
+    public void replaceBuildings(java.util.Collection<Building> scanned) {
+        buildings.clear();
+        for (Building b : scanned) buildings.put(b.getId(), b);
+        if (!buildings.isEmpty()) calculateDimensions();
+        markDirty();
+    }
+
+    /** Monotonic next id the scanner uses when allocating rebuilt Buildings. */
+    public int nextBuildingId() {
+        int max = 0;
+        for (Integer id : buildings.keySet()) if (id > max) max = id;
+        return max + 1;
+    }
+
+    /**
      * Sets an initial bounding box centered on {@code center} with the
      * given radius. Used by player- or worldgen-founded villages that
      * have no buildings yet — the box would otherwise be degenerate at

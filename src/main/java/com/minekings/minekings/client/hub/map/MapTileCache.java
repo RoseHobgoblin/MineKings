@@ -60,6 +60,21 @@ public final class MapTileCache {
     /** Visible-village snapshot; refreshed whole on each payload. */
     private final Map<Long, MapRegionPayload.VillageMarker> villagesByPos = new HashMap<>();
 
+    /** Per-chunk tile override (e.g. {@code minekings:house}) from village scan. */
+    private final Map<Long, ResourceLocation> tileOverrides = new HashMap<>();
+
+    /** Chunk → village region lookup for outline render + hover hit-test. */
+    private final Map<Long, VillageRegion> regionByChunk = new HashMap<>();
+    private final List<VillageRegion> regions = new ArrayList<>();
+
+    /** A village's chunk footprint + culture color + its marker data. */
+    public record VillageRegion(
+            int villageId,
+            int colorRGB,
+            java.util.Set<Long> chunks,
+            MapRegionPayload.VillageMarker marker
+    ) {}
+
     private boolean inFlight = false;
     private long lastRequestMs = 0L;
     /** Monotonic version bumped on every tile mutation. Viewport-level
@@ -74,6 +89,9 @@ public final class MapTileCache {
     public void clear() {
         tiles.clear();
         villagesByPos.clear();
+        tileOverrides.clear();
+        regionByChunk.clear();
+        regions.clear();
         inFlight = false;
         version++;
     }
@@ -101,12 +119,25 @@ public final class MapTileCache {
      * hot path — keep cheap.
      */
     public @Nullable ResourceLocation biomeAt(int chunkX, int chunkZ) {
-        ChunkTile t = tiles.get(ChunkPos.asLong(chunkX, chunkZ));
+        long key = ChunkPos.asLong(chunkX, chunkZ);
+        ResourceLocation override = tileOverrides.get(key);
+        if (override != null) return override;
+        ChunkTile t = tiles.get(key);
         return t == null ? null : t.biome();
     }
 
     public List<MapRegionPayload.VillageMarker> villages() {
         return new ArrayList<>(villagesByPos.values());
+    }
+
+    /** All known village regions (for outline rendering). */
+    public List<VillageRegion> villageRegions() {
+        return regions;
+    }
+
+    /** Village whose chunk set contains {@code (cx, cz)}, or {@code null}. */
+    public @Nullable VillageRegion villageAtChunk(int chunkX, int chunkZ) {
+        return regionByChunk.get(ChunkPos.asLong(chunkX, chunkZ));
     }
 
     /**
@@ -122,6 +153,33 @@ public final class MapTileCache {
             long key = ChunkPos.asLong(m.blockX() >> 4, m.blockZ() >> 4);
             villagesByPos.put(key, m);
         }
+
+        // Replace tile overrides wholesale.
+        tileOverrides.clear();
+        for (MapRegionPayload.ChunkTileOverride o : p.tileOverrides()) {
+            ResourceLocation rl = ResourceLocation.tryParse(o.tileId());
+            if (rl == null) continue;
+            tileOverrides.put(ChunkPos.asLong(o.chunkX(), o.chunkZ()), rl);
+        }
+
+        // Rebuild village regions and the reverse chunk → region index.
+        regionByChunk.clear();
+        regions.clear();
+        for (MapRegionPayload.VillageChunks vc : p.villageChunks()) {
+            java.util.Set<Long> chunkSet = new java.util.HashSet<>(vc.chunkPosLongs().length * 2);
+            for (long cp : vc.chunkPosLongs()) chunkSet.add(cp);
+            // Pair the region with its marker so hover can surface the tooltip
+            // without a second lookup.
+            MapRegionPayload.VillageMarker marker = null;
+            for (MapRegionPayload.VillageMarker m : p.markers()) {
+                long mk = ChunkPos.asLong(m.blockX() >> 4, m.blockZ() >> 4);
+                if (chunkSet.contains(mk)) { marker = m; break; }
+            }
+            VillageRegion region = new VillageRegion(vc.villageId(), vc.colorRGB(), chunkSet, marker);
+            regions.add(region);
+            for (long cp : vc.chunkPosLongs()) regionByChunk.put(cp, region);
+        }
+
         inFlight = false;
         version++;
     }

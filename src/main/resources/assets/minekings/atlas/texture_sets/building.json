@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:hut": 1,
+      "minekings:house_small": 1
+    }
+  }
+}

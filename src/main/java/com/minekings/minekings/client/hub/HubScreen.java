@@ -79,6 +79,10 @@ public class HubScreen extends Screen {
     private record MarkerHit(int cx, int cy, int radius, MapRegionPayload.VillageMarker marker) {}
     private final List<MarkerHit> markerHits = new ArrayList<>();
 
+    // Cached from the last renderMap so hover handlers can translate mouse
+    // coords back to chunk coords without recomputing the transform.
+    private int lastOriginX, lastOriginY, lastPxPerChunk = 16;
+
     /** Pre-resolved subtile draw command. Coordinates are world-space-ish
      *  (origin-independent): {@code baseX = minChunkX*pxPerChunk + s.x*halfChunkPx}.
      *  The current frame's {@code originX}/{@code originY} are added at draw
@@ -175,9 +179,9 @@ public class HubScreen extends Screen {
         super.render(gfx, mouseX, mouseY, partialTick);
 
         if (activePanel == null) {
-            MarkerHit hit = pickMarker(mouseX, mouseY);
-            if (hit != null) {
-                renderVillageTooltip(gfx, mouseX, mouseY, hit.marker());
+            MapRegionPayload.VillageMarker m = pickVillage(mouseX, mouseY);
+            if (m != null) {
+                renderVillageTooltip(gfx, mouseX, mouseY, m);
             }
         }
 
@@ -226,6 +230,10 @@ public class HubScreen extends Screen {
         int originX = (int) Math.round(mapLeft + mapW / 2.0 - viewBlockX * pxPerBlock);
         int originY = (int) Math.round(mapTop  + mapH / 2.0 - viewBlockZ * pxPerBlock);
 
+        this.lastOriginX = originX;
+        this.lastOriginY = originY;
+        this.lastPxPerChunk = pxPerChunk;
+
         // Fog under unknown chunks.
         for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
             for (int cx = minChunkX; cx <= maxChunkX; cx++) {
@@ -238,6 +246,9 @@ public class HubScreen extends Screen {
         }
 
         renderAutotiledTerrain(gfx, originX, originY, minChunkX, minChunkZ, maxChunkX, maxChunkZ, pxPerChunk);
+
+        renderVillageOutlines(gfx, originX, originY, pxPerChunk,
+                minChunkX, minChunkZ, maxChunkX, maxChunkZ);
 
         // Village markers — icon varies by MarkerType + zoom LOD.
         for (MapRegionPayload.VillageMarker m : MapTileCache.INSTANCE.villages()) {
@@ -378,13 +389,55 @@ public class HubScreen extends Screen {
         gfx.drawString(this.font, label, 12, this.height - TAB_ROW_HEIGHT - 28, COLOR_FRAME_HI, false);
     }
 
-    private @Nullable MarkerHit pickMarker(int mouseX, int mouseY) {
+    private @Nullable MapRegionPayload.VillageMarker pickVillage(int mouseX, int mouseY) {
+        // Region hit-test first: anywhere inside the building cluster counts.
+        int pxc = Math.max(1, lastPxPerChunk);
+        int cx = Math.floorDiv(mouseX - lastOriginX, pxc);
+        int cz = Math.floorDiv(mouseY - lastOriginY, pxc);
+        MapTileCache.VillageRegion region = MapTileCache.INSTANCE.villageAtChunk(cx, cz);
+        if (region != null && region.marker() != null) return region.marker();
+
+        // Fall back to circular marker hit-test for unscanned villages.
         for (MarkerHit h : markerHits) {
             int dx = mouseX - h.cx;
             int dy = mouseY - h.cy;
-            if (dx * dx + dy * dy <= h.radius * h.radius) return h;
+            if (dx * dx + dy * dy <= h.radius * h.radius) return h.marker();
         }
         return null;
+    }
+
+    /**
+     * Draws a 1-px outline around each village's chunk union, tinted by the
+     * village's culture color. An outline edge is any side of a village-owned
+     * chunk whose neighbor is not in the same village.
+     */
+    private void renderVillageOutlines(GuiGraphics gfx, int originX, int originY, int pxPerChunk,
+                                       int minChunkX, int minChunkZ, int maxChunkX, int maxChunkZ) {
+        List<MapTileCache.VillageRegion> regions = MapTileCache.INSTANCE.villageRegions();
+        if (regions.isEmpty()) return;
+        for (MapTileCache.VillageRegion r : regions) {
+            int outlineARGB = 0xFF000000 | (r.colorRGB() & 0xFFFFFF);
+            for (long cp : r.chunks()) {
+                net.minecraft.world.level.ChunkPos pos = new net.minecraft.world.level.ChunkPos(cp);
+                int cx = pos.x;
+                int cz = pos.z;
+                if (cx < minChunkX - 1 || cx > maxChunkX + 1 || cz < minChunkZ - 1 || cz > maxChunkZ + 1) continue;
+
+                int x0 = originX + cx * pxPerChunk;
+                int y0 = originY + cz * pxPerChunk;
+                int x1 = x0 + pxPerChunk;
+                int y1 = y0 + pxPerChunk;
+
+                if (!r.chunks().contains(net.minecraft.world.level.ChunkPos.asLong(cx, cz - 1)))
+                    gfx.fill(x0, y0, x1, y0 + 1, outlineARGB); // top
+                if (!r.chunks().contains(net.minecraft.world.level.ChunkPos.asLong(cx, cz + 1)))
+                    gfx.fill(x0, y1 - 1, x1, y1, outlineARGB); // bottom
+                if (!r.chunks().contains(net.minecraft.world.level.ChunkPos.asLong(cx - 1, cz)))
+                    gfx.fill(x0, y0, x0 + 1, y1, outlineARGB); // left
+                if (!r.chunks().contains(net.minecraft.world.level.ChunkPos.asLong(cx + 1, cz)))
+                    gfx.fill(x1 - 1, y0, x1, y1, outlineARGB); // right
+            }
+        }
     }
 
     private void renderVillageTooltip(GuiGraphics gfx, int mouseX, int mouseY, MapRegionPayload.VillageMarker m) {

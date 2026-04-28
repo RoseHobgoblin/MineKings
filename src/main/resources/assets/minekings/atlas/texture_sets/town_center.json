@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:well": 2,
+      "minekings:church": 1
+    }
+  }
+}

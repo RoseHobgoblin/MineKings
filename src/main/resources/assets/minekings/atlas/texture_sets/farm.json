@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "data": {
+    "textures": {
+      "minekings:farmland_l": 1,
+      "minekings:farmland_s": 1
+    }
+  }
+}

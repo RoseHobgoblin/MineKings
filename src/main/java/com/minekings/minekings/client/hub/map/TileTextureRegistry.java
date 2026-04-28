@@ -123,8 +123,14 @@ public final class TileTextureRegistry {
                     .orElseGet(() -> TileTextureSet.of(DEFAULT_SET, java.util.List.of()));
         }
         return RESOLVE_CACHE.computeIfAbsent(biomeId, id -> {
-            String direct = DIRECT.get(id.toString());
             TileTextureSetManager mgr = TileTextureSetManager.getInstance();
+            // minekings:* tiles (building overrides, future mod tiles) resolve
+            // directly to their own texture set if one is registered.
+            if (MineKings.MODID.equals(id.getNamespace())) {
+                Optional<TileTextureSet> d = mgr.get(id);
+                if (d.isPresent()) return d.get();
+            }
+            String direct = DIRECT.get(id.toString());
             if (direct != null) {
                 Optional<TileTextureSet> d = mgr.get(direct);
                 if (d.isPresent()) return d.get();
@@ -132,6 +138,26 @@ public final class TileTextureRegistry {
             return mgr.get(DEFAULT_SET)
                     .orElseGet(() -> TileTextureSet.of(DEFAULT_SET, java.util.List.of()));
         });
+    }
+
+    /**
+     * Pairs of tile IDs that should stitch to each other even though they
+     * belong to different texture sets. Currently: {@code path_x} ↔
+     * {@code path_z} so orthogonal paths meet cleanly.
+     */
+    private static final Map<String, String> STITCH_ALIAS;
+    static {
+        Map<String, String> m = new HashMap<>();
+        m.put("minekings:path_x", "minekings:path_z");
+        m.put("minekings:path_z", "minekings:path_x");
+        STITCH_ALIAS = Map.copyOf(m);
+    }
+
+    /** True if the two tile IDs are declared to stitch to each other. */
+    public static boolean stitchAliased(ResourceLocation a, ResourceLocation b) {
+        if (a == null || b == null) return false;
+        String target = STITCH_ALIAS.get(a.toString());
+        return target != null && target.equals(b.toString());
     }
 
     public static TileTextureSet resolve(Holder<Biome> holder) {
